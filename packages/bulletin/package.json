@@ -1,0 +1,13 @@
+{
+  "name": "@noir/bulletin",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^5"
+  }
+}

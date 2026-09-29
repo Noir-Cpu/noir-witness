@@ -9,10 +9,15 @@
     "migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@neondatabase/serverless": "^0.10.0",
     "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.11"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./pglite": "./src/pglite.ts"
   }
 }

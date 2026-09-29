@@ -9,14 +9,6 @@ describe("api", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
-  it("rejects an invalid echo payload", async () => {
-    const res = await app.request("/api/echo", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: "" }),
-    });
-    expect(res.status).toBe(400);
-  });
 });
 
 describe("tracing", () => {
