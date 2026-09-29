@@ -6,11 +6,14 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc -p .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:local": "tsx src/dev-server.ts",
+    "test:concurrency": "vitest run src/domain/cast.test.ts --disableConsoleIntercept"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.7.6",
     "@hono/zod-validator": "^0.9.1",
+    "@noir/bulletin": "*",
     "@noir/db": "*",
     "@sentry/cloudflare": "^11.1.0",
     "@simplewebauthn/server": "^13.3.3",

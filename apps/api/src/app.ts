@@ -10,7 +10,7 @@ import { createAuth, type AuthEnv } from "./auth";
 import { castBallot, loadBulletinPoll } from "./domain/cast";
 import { deriveSecret } from "./domain/crypto";
 import {
-  DomainError, addOption, closePoll, createPoll, listPolls, openPoll, pollDetail, publishPoll, removeOption,
+  DomainError, addOption, ownedPoll, closePoll, createPoll, listPolls, openPoll, pollDetail, publishPoll, removeOption,
   resetVoterPasskey, rotateInvite, updatePoll, uploadRoll,
 } from "./domain/polls";
 import { beginVoterAuth, finishVoterAuth, readSession, type WebAuthnConfig } from "./domain/voter-auth";
@@ -113,6 +113,14 @@ export function createApp(deps: Deps = {}) {
       return c.json({ id: poll.id }, 201);
     },
   );
+
+  // The organiser can read the signed bulletin as soon as the poll is closed, before deciding to publish it.
+  org.get("/polls/:id/bulletin", async (c) => {
+    const { organiser, db } = await requireOrganiser(c);
+    const poll = await ownedPoll(db, uuid.parse(c.req.param("id")), organiser.id);
+    if (!poll.bulletin) throw new DomainError("not_closed", "The poll has not been closed", 404);
+    return c.body(poll.bulletin, 200, { "content-type": "application/json" });
+  });
 
   org.get("/polls/:id", async (c) => {
     const { organiser, db } = await requireOrganiser(c);

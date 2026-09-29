@@ -5,11 +5,11 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: { baseURL: "http://localhost:8787", trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  // Serves the built web app and the API from one Worker, as in production.
+  // The real API on in-process Postgres (PGlite) with a fixed organiser, serving the built web app. wrangler dev needs a database.
   webServer: {
-    command: "npm run build -w @noir/web && npm run dev -w @noir/api",
+    command: "npm run build -w @noir/web && npm run dev:local -w @noir/api",
     url: "http://localhost:8787/api/health",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
     env: { WRANGLER_SEND_METRICS: "false" },
   },
