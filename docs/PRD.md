@@ -1,6 +1,6 @@
 # CASE 001 / WITNESS: PRD
 
-Status: draft for review. Owner: John Balogun. Target: pilot with the Stellenbosch Developer Society.
+Status: MVP built; revised after John's decisions (see section 13). Owner: John Balogun. Target: pilot with the Stellenbosch Developer Society, date not fixed.
 
 ## 1. Problem
 
@@ -31,7 +31,7 @@ Student societies and clubs run votes on Google Forms or WhatsApp polls: no elig
 ## 5. Scope
 
 **MVP (4 to 6 weeks):** single-choice polls, invite links, passkey sign-in, cast with receipt, results on close, public bulletin board, verifier script.
-**v1.1:** ranked choice, organisation admin roles, CSV voter import.
+**v1.1:** ranked choice, organisation admin roles.
 **v2:** RSA blind signatures ([RFC 9474](https://www.rfc-editor.org/rfc/rfc9474)) for cryptographic unlinkability; STRIDE threat-model write-up.
 
 ## 6. Key design decisions
@@ -47,13 +47,13 @@ Each is an ADR in `docs/adr/`.
 
 ## 7. Flows
 
-**Organiser:** sign in with GitHub, create organisation and poll, paste voter emails, open poll, close poll, publish.
-**Voter:** open invite link, create passkey (biometric prompt), see ballot, choose, confirm, receive receipt code.
+**Organiser:** sign in with GitHub, create poll and options, upload a CSV of student numbers, create the invite link and share it by hand, open poll, close poll, publish.
+**Voter:** open invite link, enter student number, create or confirm a passkey (biometric prompt), see ballot, choose, confirm, receive receipt code.
 **Auditor:** download the published file, run `verify.ts`, compare root, tally and their own receipt.
 
 ## 8. Data model (draft)
 
-`organisations`, `polls`, `questions`, `options`, `eligible_voters` (invite token stored as hash), `participations` (unique poll + voter, hour bucket only), `ballots` (random receipt, selections, no timestamp, no voter reference), `audit_events` (organiser actions only, never voter actions).
+`organisations`, `polls`, `questions`, `options`, `eligible_voters` (salted hash of the student number, plus the passkey bound on first use), `participations` (unique poll + voter, hour bucket only), `ballots` (random receipt, selections, no timestamp, no voter reference), `audit_events` (organiser actions only, never voter actions).
 
 ## 9. Threat model summary (full STRIDE in v2)
 
@@ -64,16 +64,16 @@ Each is an ADR in `docs/adr/`.
 | Server links voter to ballot | Separate tables, no timestamps, sorted output | A malicious server operator could log requests; MVP trusts the operator, v2 blind signatures remove that trust |
 | Ballot tampering after close | Signed Merkle root published outside the database | Depends on the signing key staying secret |
 | Vote buying via receipt | Not prevented (non-goal) | Stated in the README |
-| Invite link leaks | Single-use, expiring, hashed at rest, bound to a passkey on first use | Someone with the link and the voter's phone |
+| Invite link leaks | Code hashed at rest and kept in the URL fragment; the student number must also be on the roll; the passkey binds on first use; the organiser can rotate the code and clear a claim | Student numbers are not secret: whoever has the code and a member's number first can claim that member's slot (ADR 0008, 0010) |
 | Small polls deanonymise by turnout order | Publish only after close, no order information | Very small polls (under 10) reveal more; UI warns |
 
 ## 10. Risks and open questions
 
-1. **Pilot date.** The society's next election or AGM sets the MVP deadline. **Needed from the organiser.**
+1. **Pilot date.** Undecided. There is no deadline pressure; the MVP was built properly rather than to a date.
 2. **Small electorates.** Below a minimum size, secrecy is weak by construction. Suggested: warn under 10 voters.
 3. **Interim commitments.** Publishing signed roots while a poll is open commits to a set that changes as ballots arrive, so roots are not consistent with each other. Decide whether to publish interim roots at all, or only the final one.
 4. **Signing key custody.** Cloudflare secret for MVP; document the trust assumption honestly.
-5. **Email delivery for invites.** Free-tier email sender needed (Cloudflare Email or Resend); alternative is organiser shares links manually.
+5. **Email delivery for invites.** Decided: none. The organiser shares links manually (ADR 0013); a sender can be added later.
 6. **Legal.** POPIA: privacy notice, retention job, synthetic data in all public demos, written permission from the society before the pilot.
 
 ## 11. Capacity estimate (10k DAU shape)
@@ -87,3 +87,11 @@ A society of 2,000 voting in a 10 minute window is about 3 writes/s average, spi
 3. Week 3: close, Merkle root, signature, bulletin board, verifier script.
 4. Week 4: organiser UI, accessibility pass, dry run with 10 friends.
 5. Week 5 to 6: buffer, threat-model page, pilot with the society, postmortem.
+
+## 13. Decisions since the first draft
+
+1. **Pilot date undecided.** Build properly; no deadline.
+2. **Public elections stay out of scope.** Eligibility may be checked against a student-number roll inside a university: the organiser uploads a CSV, voters enter their number and the invite code, numbers are stored only as per-poll salted hashes (ADR 0010). This shows the voter knew a number on the list; it does not prove they are that student.
+3. **No email sending.** Organisers share invite links by hand (ADR 0013).
+4. **Voter authentication** is invite code, student number, then a WebAuthn passkey through `@simplewebauthn/server` (ADR 0008). Better Auth stays for organisers.
+5. **Load testing** uses a Node script against PGlite in-process (`scripts/load.ts`). It is not a substitute for the k6 run against a Neon staging branch in criterion 3, which has not been done.

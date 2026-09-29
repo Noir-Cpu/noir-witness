@@ -76,7 +76,8 @@ describe("cast", () => {
 // PGlite runs statements one at a time on a single connection, so these tests exercise the statement's logic and the
 // unique constraint, not row-level contention between separate Postgres backends. That is stated in the README.
 
-const stats = { runs: 0, attempts: 0, voters: 0, ballots: 0 };
+const mk = () => ({ runs: 0, attempts: 0, voters: 0, ballots: 0 });
+const stats = { fixed1000: mk(), property: mk(), http: mk() };
 afterAll(() => {
   console.log(`[cast concurrency] ${JSON.stringify(stats)}`);
 });
@@ -94,17 +95,14 @@ describe("cast under concurrency", () => {
     const c = await counts(s.pollId);
     expect(c).toEqual({ ballots: 100, participations: 100 });
     expect(results.filter((r) => r.status === "cast")).toHaveLength(100);
-    stats.attempts += 1000;
-    stats.voters += 100;
-    stats.ballots += 100;
-    stats.runs += 1;
+    Object.assign(stats.fixed1000, { runs: 1, attempts: 1000, voters: 100, ballots: 100 });
   }, 60_000);
 
   it("property: never more than one ballot per voter, ballots = participations, tally = winning attempts", async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 2, max: 25 }),
-        fc.array(fc.record({ voter: fc.nat(), keyIx: fc.integer({ min: 0, max: 2 }), option: fc.integer({ min: 0, max: 2 }), stranger: fc.boolean() }), { minLength: 1, maxLength: 120 }),
+        fc.array(fc.record({ voter: fc.nat(), keyIx: fc.integer({ min: 0, max: 2 }), option: fc.integer({ min: 0, max: 2 }), stranger: fc.boolean() }), { minLength: 30, maxLength: 150 }),
         async (voterCount, attempts) => {
           const s = await seedOpenPoll(w.db, voterCount, 3);
           const strangerPoll = await seedOpenPoll(w.db, 1);
@@ -147,13 +145,13 @@ describe("cast under concurrency", () => {
           for (const b of stored) stored2[s.optionIds.indexOf(b.selections[0]![1])]!++;
           expect(stored2).toEqual(tally);
 
-          stats.runs++;
-          stats.attempts += jobs.length;
-          stats.voters += voted.size;
-          stats.ballots += c.ballots;
+          stats.property.runs++;
+          stats.property.attempts += jobs.length;
+          stats.property.voters += voted.size;
+          stats.property.ballots += c.ballots;
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 200 },
     );
   }, 120_000);
 
@@ -174,10 +172,7 @@ describe("cast under concurrency", () => {
     expect(created).toHaveLength(20);
     expect(res.every((r) => [200, 201, 409].includes(r.status))).toBe(true);
     expect(await counts(s.pollId)).toEqual({ ballots: 20, participations: 20 });
-    stats.attempts += 200;
-    stats.voters += 20;
-    stats.ballots += 20;
-    stats.runs += 1;
+    Object.assign(stats.http, { runs: 1, attempts: 200, voters: 20, ballots: 20 });
   }, 60_000);
 
   it("a cast that races a close is either counted or refused, never lost", async () => {

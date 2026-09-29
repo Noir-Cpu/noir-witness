@@ -1,4 +1,4 @@
-name = "noir-template-api"
+name = "noir-witness"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -11,3 +11,6 @@ run_worker_first = ["/api/*"]
 
 [observability]
 enabled = true
+
+# Secrets (wrangler secret put): DATABASE_URL, BETTER_AUTH_SECRET, SIGNING_KEY, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET.
+# Optional: BETTER_AUTH_URL, SENTRY_DSN_API, GRAFANA_OTLP_ENDPOINT, GRAFANA_OTLP_AUTH. See docs/SETUP.md.
