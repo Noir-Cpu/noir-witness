@@ -31,7 +31,7 @@ All numbers below come from runs on this machine (Node 22.22.2, Linux) on 2026-0
 | A mutated cast statement is caught | Making the ballot insert ignore the participation result fails 4 tests | manual edit, reverted |
 | Verifier catches tampering | Changing one ballot, removing, adding or reordering ballots, or re-signing with another key each make `scripts/verify.ts` exit 1 | `npm test -w @noir/api` (`verify.test.ts`) |
 | Secrecy checks | 13 tests: table columns, no shared column but `poll_id`, foreign keys, hour buckets, sorted output, no voter ids in the published file | `secrecy.test.ts` |
-| End to end | 4 Playwright tests pass in Chromium, including passkey creation and re-authentication with a virtual authenticator, a keyboard-only vote, and axe (WCAG 2.2 AA tags) on each voter and organiser screen | `npm run e2e` |
+| End to end | 4 Playwright tests pass in Chromium, including passkey creation and re-authentication with a virtual authenticator, a ballot chosen and submitted from the keyboard (arrow keys and Enter), and axe (WCAG 2.2 AA tags) on the main voter, organiser, results and receipt-check screens. A manual screen-reader pass was not done | `npm run e2e` |
 | Cast latency, local | 700 casts at a paced 35/s: p50 4.2 ms, p95 6.5 ms, p99 7.1 ms. At an offered 1,000/s the process sustained about 577/s and latency climbed to p95 1,628 ms (queueing). **In-process Hono + PGlite, no network, one connection: not a production figure.** | `npx tsx scripts/load.ts` and `--rate 1000 --seconds 2` |
 | Close, local | Building and signing a bulletin for 2,000 ballots took 79 ms in Node. Not measured on Workers | ad hoc script |
 | Code coverage | not measured | |
