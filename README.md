@@ -24,7 +24,7 @@ All numbers below come from runs on this machine (Node 22.22.2, Linux) on 2026-0
 
 | Claim | Result | Command |
 | --- | --- | --- |
-| Unit and integration tests | 97 pass in `apps/api`, 17 in `packages/bulletin`, 10 in `apps/web` (plus 1 skipped: the `PRIVACY_STRICT` check, which fails until the notice placeholders are filled in) | `npm test` |
+| Unit and integration tests | 97 pass in `apps/api`, 17 in `packages/bulletin`, 11 in `apps/web` (plus 1 skipped: the `PRIVACY_STRICT` check, which fails until the notice placeholders are filled in) | `npm test` |
 | No duplicate ballots under concurrent attempts | 1,000 attempts from 100 voters gave exactly 100 ballots and 100 participations | `npm run test:concurrency -w @noir/api` |
 | Property test (fast-check) | 200 generated runs, 9,454 cast attempts from 1,777 voters (in that run) gave 1,777 ballots and 1,777 participations; never more than one per voter; stored tally equals the winning attempts. Attempts per run vary with the random seed. | same |
 | Same, through the HTTP endpoint | 200 attempts from 20 voters gave 20 ballots | same |
@@ -70,7 +70,7 @@ Node 22.18 or later runs the TypeScript file directly. Without `--pubkey` the sc
 
 **Decisions** (each has an ADR in [docs/adr](docs/adr)): in-Worker rate limits (0014), no telemetry on voter pages (0015), erasing voter data and retention (0016), passkeys not fingerprints (0002), separate tables (0003), atomic cast (0004), no timing side channel (0005), Merkle commitment (0006), live results off (0007), voter authentication and why not Better Auth's passkey plugin (0008), receipts from idempotency keys (0009), the student-number roll (0010), independent verifier and key pinning (0011), close waits for casts (0012), manual invites and hidden turnout (0013).
 
-**Privacy.** Voter pages load no analytics or error reporting; the invite code lives in the URL fragment and never reaches a server or a log ([ADR 0015](docs/adr/0015-no-telemetry-on-voter-pages.md)). After a poll closes, the organiser can erase the voter list, passkeys and who-voted records, and a daily job does it after `PURGE_DAYS` (default 90); ballots and the signed bulletin stay and still verify ([ADR 0016](docs/adr/0016-erase-voter-data-and-retention.md)). The notice voters see is [docs/PRIVACY-NOTICE.md](docs/PRIVACY-NOTICE.md), served at `/privacy`; it is a draft with highlighted placeholders to fill in.
+**Privacy.** Voter pages load no analytics or error reporting; the invite code lives in the URL fragment and never reaches a server or a log ([ADR 0015](docs/adr/0015-no-telemetry-on-voter-pages.md)). After a poll closes, the organiser can erase the voter list, passkeys and who-voted records, and a daily job does it after `PURGE_DAYS` (default 30); ballots and the signed bulletin stay and still verify ([ADR 0016](docs/adr/0016-erase-voter-data-and-retention.md)). The notice voters see is [docs/PRIVACY-NOTICE.md](docs/PRIVACY-NOTICE.md), served at `/privacy`; it is a draft with highlighted placeholders to fill in.
 
 **Run it locally** (no database needed):
 

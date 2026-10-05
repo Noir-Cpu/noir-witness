@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { and, count, eq } from "drizzle-orm";
 import { auditEvents, ballots, eligibleVoters, participations, polls, type Db } from "@noir/db";
@@ -33,7 +34,7 @@ describe("organiser: erase voter data", () => {
     expect(before).toMatchObject({ ballots: 12, participations: 12, voters: 14 });
     const detailBefore = (await (await w.request(`/api/organiser/polls/${e.pollId}`)).json()) as { eligible: number; turnout: number; retention: { erased: boolean; erasesAt: string } };
     expect(detailBefore.retention.erased).toBe(false);
-    expect(detailBefore.retention.erasesAt).toBe(new Date(w.clock.now.getTime() + 90 * DAY).toISOString());
+    expect(detailBefore.retention.erasesAt).toBe(new Date(w.clock.now.getTime() + 30 * DAY).toISOString());
 
     const res = await w.json("POST", `/api/organiser/polls/${e.pollId}/erase-voter-data`);
     expect(res.status).toBe(200);
@@ -139,7 +140,7 @@ describe("daily purge", () => {
     w = await makeWorld();
     await election("old", t0);
     await election("oldTwo", new Date(t0.getTime() + DAY));
-    await election("recent", new Date(t0.getTime() + 60 * DAY));
+    await election("recent", new Date(t0.getTime() + 25 * DAY));
     await election("boundary", new Date(t0.getTime() + 10 * DAY));
     await election("justInside", new Date(t0.getTime() + 10 * DAY + 1000));
     await election("openOld", null); // opened on 2026-01-01 and never closed
@@ -148,12 +149,12 @@ describe("daily purge", () => {
     await w.db.update(polls).set({ status: "closed", closedAt: t0 }).where(eq(polls.id, ids.noBulletinOld));
   });
 
-  const now = new Date(t0.getTime() + 100 * DAY); // boundary was closed exactly 90 days earlier, justInside one second later
+  const now = new Date(t0.getTime() + 40 * DAY); // boundary was closed exactly 30 days earlier, justInside one second later
   const all = () => Promise.all(Object.entries(ids).map(async ([k, id]) => [k, await snapshot(w.db, id)] as const));
 
   it("dry run lists exactly the polls that would be erased and writes nothing", async () => {
     const before = await all();
-    const r = await purgeExpired(w.db, { now, days: 90, dryRun: true });
+    const r = await purgeExpired(w.db, { now, days: 30, dryRun: true });
     expect(r.dryRun).toBe(true);
     expect(r.polls.map((p) => p.pollId).sort()).toEqual([ids.old, ids.oldTwo, ids.boundary].sort());
     expect(r.polls.every((p) => p.voters === 14)).toBe(true);
@@ -164,7 +165,7 @@ describe("daily purge", () => {
 
   it("erases only closed, signed polls past the cutoff; ballots, bulletins and everything else stay", async () => {
     const before = Object.fromEntries(await all());
-    const r = await purgeExpired(w.db, { now, days: 90 });
+    const r = await purgeExpired(w.db, { now, days: 30 });
     expect(r.erasedVoters).toBe(42);
     const after = Object.fromEntries(await all());
     for (const k of ["old", "oldTwo", "boundary"] as const) {
@@ -191,7 +192,7 @@ describe("daily purge", () => {
   it("is idempotent: a second run changes and records nothing", async () => {
     const before = await all();
     const logged = (await erasures(w.db)).length;
-    const r = await purgeExpired(w.db, { now, days: 90 });
+    const r = await purgeExpired(w.db, { now, days: 30 });
     expect(r.polls).toEqual([]);
     expect(r.erasedVoters).toBe(0);
     expect(await all()).toEqual(before);
@@ -199,7 +200,7 @@ describe("daily purge", () => {
   });
 
   it("picks up a poll once it ages past the cutoff, and nothing earlier", async () => {
-    const r = await purgeExpired(w.db, { now: new Date(t0.getTime() + 60 * DAY + 90 * DAY), days: 90, dryRun: true });
+    const r = await purgeExpired(w.db, { now: new Date(t0.getTime() + 25 * DAY + 30 * DAY), days: 30, dryRun: true });
     expect(r.polls.map((p) => p.pollId).sort()).toEqual([ids.recent, ids.justInside].sort());
   });
 
@@ -222,10 +223,16 @@ describe("daily purge", () => {
 });
 
 describe("PURGE_DAYS", () => {
-  it("defaults to 90 and ignores anything that is not a whole number of days of at least 1", () => {
+  it("the wrangler.toml value equals the code default, so the privacy notice's period has one meaning", () => {
+    const toml = readFileSync(fileURLToPath(new URL("../wrangler.toml", import.meta.url)), "utf8");
+    expect(/PURGE_DAYS = "(\d+)"/.exec(toml)?.[1]).toBe(String(DEFAULT_PURGE_DAYS));
+    expect(DEFAULT_PURGE_DAYS).toBe(30);
+  });
+
+  it("defaults to 30 and ignores anything that is not a whole number of days of at least 1", () => {
     expect(purgeDaysFrom(undefined)).toBe(DEFAULT_PURGE_DAYS);
     expect(purgeDaysFrom("30")).toBe(30);
     expect(purgeDaysFrom(" 45 ")).toBe(45);
-    for (const bad of ["", "0", "00", "-5", "abc", "1.5", "1e3", "99999"]) expect(purgeDaysFrom(bad), bad).toBe(90);
+    for (const bad of ["", "0", "00", "-5", "abc", "1.5", "1e3", "99999"]) expect(purgeDaysFrom(bad), bad).toBe(30);
   });
 });

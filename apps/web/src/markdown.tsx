@@ -4,7 +4,7 @@ import { Fragment, type ReactNode } from "react";
 // block quotes, tables, **bold**, `code`, [links](url) and bare URLs. It builds React elements, never HTML strings,
 // so nothing in the source can inject markup. Any other [bracketed] text is a placeholder and is shown highlighted.
 
-const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s)]+[^\s).,;])|\[([^\]]+)\]/g;
+const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)|(https?:\/\/[^\s)]+[^\s).,;])|\[([^\]]+)\]/g;
 
 export function inline(text: string, key = "i"): ReactNode[] {
   const out: ReactNode[] = [];
@@ -29,7 +29,7 @@ const isTableRule = (l: string) => /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$/
 
 /** Every `[placeholder]` left in a Markdown source (links and checkbox markers are not placeholders). */
 export function placeholders(source: string): string[] {
-  const plain = source.replace(/`[^`]*`/g, "").replace(/\[[^\]]+\]\(https?:\/\/[^)\s]+\)/g, "");
+  const plain = source.replace(/`[^`]*`/g, "").replace(/\[[^\]]+\]\((?:https?:\/\/|mailto:)[^)\s]+\)/g, "");
   return [...plain.matchAll(/\[([^\]]+)\]/g)].map((m) => m[0]);
 }
 

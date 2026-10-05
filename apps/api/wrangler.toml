@@ -17,9 +17,9 @@ enabled = true
 [triggers]
 crons = ["17 3 * * *"]
 
-# Plain configuration, not a secret. Whole days after close; anything else falls back to 90.
+# Plain configuration, not a secret. Whole days after close; anything else falls back to 30.
 [vars]
-PURGE_DAYS = "90"
+PURGE_DAYS = "30"
 
 # In-Worker rate limits for the voter endpoints (ADR 0014; app.ts `vote.use`, `/start`). Workers.dev has no zone, so a
 # dashboard rule is not possible. namespace_ids must be unique per account: noir-dispatch uses 1001.

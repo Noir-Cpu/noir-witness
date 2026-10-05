@@ -8,7 +8,7 @@ import { DomainError, ownedPoll } from "./polls";
 // participations (who voted, hour bucket). What never goes: ballots, the signed bulletin, the poll itself, audit rows.
 // The bulletin carries its own eligible and participation counts, so verification does not read the deleted rows.
 
-export const DEFAULT_PURGE_DAYS = 90;
+export const DEFAULT_PURGE_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 // PURGE_DAYS is a plain var. Anything that is not a whole number of at least 1 falls back to the default, so a typo can

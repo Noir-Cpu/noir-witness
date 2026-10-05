@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Markdown, placeholders } from "./markdown";
 import { Privacy, publicNotice } from "./pages/Privacy";
+import { NOTICE, fillNotice } from "./notice-config";
 
 describe("markdown renderer", () => {
   it("renders the supported subset as elements, escaping everything else", () => {
@@ -41,9 +42,19 @@ describe("the privacy notice page", () => {
     expect(html).toMatch(/do not run on the voting page or the receipt-check page|do <strong>not<\/strong> run on the voting page/);
   });
 
-  it("highlights every unfilled placeholder", () => {
+  it("shows the society, officer, contact and retention from notice-config.ts, once each in the config", () => {
+    expect(html).toContain(NOTICE.society);
+    expect(html).toContain(NOTICE.officer);
+    expect(html).toContain(`<a href="mailto:${NOTICE.email}"`);
+    expect(html).toContain(`erased automatically ${NOTICE.retentionDays} days after`);
+    expect(NOTICE.retentionDays).toBe(30);
+    expect(html).not.toContain("{{");
+    expect(fillNotice("{{unknown}} {{email}}")).toContain("{{unknown}}");
+  });
+
+  it("highlights every unfilled placeholder: only the date and the organiser-account retention remain", () => {
     const left = placeholders(publicNotice);
-    expect(left.length).toBeGreaterThan(0); // until John fills them in; PRIVACY_STRICT=1 turns this into a failure
+    expect(left.sort()).toEqual(["[2]", "[date]"]); // John's; PRIVACY_STRICT=1 turns these into a failure
     expect((html.match(/class="placeholder"/g) ?? []).length).toBe(left.length);
   });
 
@@ -52,6 +63,7 @@ describe("the privacy notice page", () => {
   it.skipIf(process.env.PRIVACY_STRICT !== "1")("STRICT: no unfilled [placeholder] and no draft box remain in /privacy", () => {
     expect(placeholders(publicNotice)).toEqual([]);
     expect(html).not.toContain("[");
+    expect(html).not.toContain("{{");
     expect(html).not.toContain("DRAFT");
   });
 });

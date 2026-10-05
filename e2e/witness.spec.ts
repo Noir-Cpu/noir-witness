@@ -150,7 +150,7 @@ test("organiser to voter to verified receipt", async ({ page, browser }) => {
 
   // --- Organiser erases the voter data; the result and the receipt check are unaffected.
   await page.reload();
-  await expect(page.getByTestId("retention-notice")).toContainText("erased automatically 90 days after you close the poll");
+  await expect(page.getByTestId("retention-notice")).toContainText("erased automatically 30 days after you close the poll");
   await page.getByRole("button", { name: "Erase voter data…" }).click();
   await axe(page);
   await page.getByRole("button", { name: "Yes, erase it" }).click();
