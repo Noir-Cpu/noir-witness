@@ -16,6 +16,7 @@ import { PollAdmin } from "./pages/PollAdmin";
 import { Vote } from "./pages/Vote";
 import { Verify } from "./pages/Verify";
 import { Results } from "./pages/Results";
+import { Privacy } from "./pages/Privacy";
 
 initTelemetry();
 
@@ -30,6 +31,7 @@ function Routes() {
   if ((m = path.match(/^\/vote\/([0-9a-f-]{36})$/))) return <Vote id={m[1]!} key={m[1]} />;
   if ((m = path.match(/^\/results\/([0-9a-f-]{36})$/))) return <Results id={m[1]!} key={m[1]} />;
   if (path === "/verify") return <Verify />;
+  if (path === "/privacy") return <Privacy />;
   return (
     <>
       <h1>Not found</h1>

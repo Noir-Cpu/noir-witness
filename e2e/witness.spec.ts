@@ -147,5 +147,22 @@ test("organiser to voter to verified receipt", async ({ page, browser }) => {
   await results.getByRole("textbox", { name: /^Receipt/ }).fill("0".repeat(32));
   await results.getByRole("button", { name: "Check" }).click();
   await expect(results.getByTestId("receipt-result")).toContainText("not in the published ballot list");
+
+  // --- Organiser erases the voter data; the result and the receipt check are unaffected.
+  await page.reload();
+  await expect(page.getByTestId("retention-notice")).toContainText("erased automatically 90 days after you close the poll");
+  await page.getByRole("button", { name: "Erase voter data…" }).click();
+  await axe(page);
+  await page.getByRole("button", { name: "Yes, erase it" }).click();
+  await expect(page.getByTestId("retention-erased")).toContainText("Voter data was erased");
+  await expect(page.getByText("1 of 12 eligible voters cast a ballot.")).toBeVisible();
+  await expect(page.getByRole("table")).toContainText("Bo");
+  await axe(page);
+  await results.goto(`/results/${pollId}`);
+  await expect(results.getByText(/recomputed the tally and Merkle root/)).toBeVisible();
+  await results.goto(`/verify?poll=${pollId}`);
+  await results.getByRole("textbox", { name: /^Receipt/ }).fill(receipt);
+  await results.getByRole("button", { name: "Check" }).click();
+  await expect(results.getByTestId("receipt-result")).toContainText("Your receipt is in the count");
   await phone.close();
 });

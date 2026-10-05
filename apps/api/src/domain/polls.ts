@@ -10,7 +10,7 @@ import { MAX_ROLL, parseRollCsv } from "./roll";
 export const SMALL_ELECTORATE = 10;
 
 export class DomainError extends Error {
-  constructor(public code: string, message: string, public status: 400 | 403 | 404 | 409 = 409) {
+  constructor(public code: string, message: string, public status: 400 | 403 | 404 | 409 | 429 = 409) {
     super(message);
   }
 }
@@ -172,7 +172,12 @@ export async function publishPoll(db: Db, userId: string, pollId: string, now: D
 export async function pollDetail(db: Db, userId: string, pollId: string) {
   const poll = await ownedPoll(db, pollId, userId);
   const shape = await loadBulletinPoll(db, pollId);
-  const { eligible, claimed, turnout } = await counts(db, pollId);
+  const live = await counts(db, pollId);
+  // Once signed, the bulletin's own counts are the record. The rows they were counted from may have been erased (ADR 0016).
+  const signed = poll.bulletin ? (JSON.parse(poll.bulletin) as Bulletin) : null;
+  const eligible = signed?.eligibleCount ?? live.eligible;
+  const turnout = signed?.participationCount ?? live.turnout;
+  const claimed = live.claimed;
   return {
     id: poll.id,
     title: poll.title,

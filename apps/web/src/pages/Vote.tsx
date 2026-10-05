@@ -130,6 +130,10 @@ export function Vote({ id }: { id: string }) {
           <Alert>{error}</Alert>
           <button type="submit" disabled={busy}>{busy ? "Checking…" : "Continue"}</button>
         </form>
+        {/* A new tab, so what you have typed is not lost. */}
+        <p className="hint">
+          <a href="/privacy" target="_blank" rel="noopener">How your data is handled<span className="sr"> (opens in a new tab)</span></a>
+        </p>
       </>
     );
   }

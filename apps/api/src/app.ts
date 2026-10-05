@@ -14,14 +14,27 @@ import {
   resetVoterPasskey, rotateInvite, updatePoll, uploadRoll,
 } from "./domain/polls";
 import { beginVoterAuth, finishVoterAuth, readSession, type WebAuthnConfig } from "./domain/voter-auth";
+import { clientAddress, ipKey, memoryVoterLimiters, studentKey, voterLimiters, type VoterLimiters } from "./guards";
+import { eraseVoterData, purgeDaysFrom, retentionStatus } from "./domain/retention";
 
-export type Env = AuthEnv & OtelEnv & { SENTRY_DSN_API?: string; SIGNING_KEY?: string };
+export type Env = AuthEnv &
+  OtelEnv & {
+    SENTRY_DSN_API?: string;
+    SIGNING_KEY?: string;
+    // Cloudflare Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Absent in tests and dev:local.
+    RATE_LIMIT_IP?: unknown;
+    RATE_LIMIT_STUDENT?: unknown;
+    // Days after close before voter data is erased by the daily cron (wrangler.toml [vars]). Plain text, not a secret.
+    PURGE_DAYS?: string;
+  };
 export type Organiser = { id: string; name: string };
 
 export type Deps = {
   db?: Db | ((env: Env) => Db);
   organiser?: (c: Context<{ Bindings: Env }>, db: Db) => Promise<Organiser | null>;
   now?: () => Date;
+  // Overrides the rate limiters regardless of bindings (tests). Default: Cloudflare bindings, else in-memory.
+  limiters?: VoterLimiters;
 };
 
 const uuid = z.string().uuid();
@@ -29,6 +42,9 @@ const uuid = z.string().uuid();
 export function createApp(deps: Deps = {}) {
   const app = new Hono<{ Bindings: Env }>().basePath("/api");
   const now = deps.now ?? (() => new Date());
+  // One in-memory pair per app instance, so tests are isolated from each other.
+  const memory = memoryVoterLimiters();
+  const limiters = (env: Env): VoterLimiters => deps.limiters ?? voterLimiters(env ?? {}, memory);
   const getDb = (env: Env): Db => (typeof deps.db === "function" ? deps.db(env) : (deps.db ?? createDb(env.DATABASE_URL)));
 
   const getOrganiser = async (c: Context<{ Bindings: Env }>): Promise<Organiser | null> => {
@@ -64,9 +80,15 @@ export function createApp(deps: Deps = {}) {
   app.use("*", tracing());
 
   app.onError((err, c) => {
-    if (err instanceof DomainError) return c.json({ error: err.code, message: err.message }, err.status);
+    if (err instanceof DomainError) {
+      if (err.status === 429) c.header("retry-after", "60");
+      return c.json({ error: err.code, message: err.message }, err.status);
+    }
     if ("getResponse" in err && typeof err.getResponse === "function") return (err as { getResponse(): Response }).getResponse();
-    console.error(JSON.stringify({ level: "error", msg: "unhandled", err: String(err) }));
+    // Voter routes carry invite codes and student numbers in request bodies; an error message could echo them, so only
+    // the error class is logged there (ADR 0015). Elsewhere a truncated message helps debugging.
+    const voter = c.req.path.startsWith("/api/vote/");
+    console.error(JSON.stringify({ level: "error", msg: "unhandled", err: err.name, ...(voter ? {} : { detail: String(err.message).slice(0, 200) }) }));
     return c.json({ error: "internal", message: "Something went wrong" }, 500);
   });
 
@@ -124,7 +146,8 @@ export function createApp(deps: Deps = {}) {
 
   org.get("/polls/:id", async (c) => {
     const { organiser, db } = await requireOrganiser(c);
-    return c.json(await pollDetail(db, organiser.id, uuid.parse(c.req.param("id"))));
+    const detail = await pollDetail(db, organiser.id, uuid.parse(c.req.param("id")));
+    return c.json({ ...detail, retention: await retentionStatus(db, detail.id, purgeDaysFrom(c.env?.PURGE_DAYS)) });
   });
 
   org.patch(
@@ -182,6 +205,12 @@ export function createApp(deps: Deps = {}) {
     return c.json({ merkleRoot: b.merkleRoot, ballotCount: b.ballotCount, tally: b.tally });
   });
 
+  // Erases the identity side of a closed poll: roll, passkeys and who-voted. Ballots and the bulletin are kept (ADR 0016).
+  org.post("/polls/:id/erase-voter-data", async (c) => {
+    const { organiser, db } = await requireOrganiser(c);
+    return c.json(await eraseVoterData(db, organiser.id, uuid.parse(c.req.param("id")), now()));
+  });
+
   org.post("/polls/:id/publish", async (c) => {
     const { organiser, db } = await requireOrganiser(c);
     await publishPoll(db, organiser.id, uuid.parse(c.req.param("id")), now());
@@ -218,8 +247,28 @@ export function createApp(deps: Deps = {}) {
     return id.data;
   };
 
+  // Per client address, before anything else is read or parsed (ADR 0014). Sign-in steps and ballot steps have their own
+  // buckets so a busy sign-in minute cannot block people who are already signed in.
+  vote.use("*", async (c, next) => {
+    const group = /\/(start|finish)$/.test(c.req.path) ? "auth" : "vote";
+    if (!(await limiters(c.env).ip.allow(ipKey(group, clientAddress(c.req.raw.headers))))) {
+      throw new DomainError(
+        "rate_limited",
+        "Many people are using this network right now, or there were too many attempts in a row. Wait a minute and try again. Your invite link still works.",
+        429,
+      );
+    }
+    await next();
+  });
+
   vote.post("/:pollId/start", zValidator("json", z.object({ code: z.string().min(8).max(64), studentNumber: z.string().min(1).max(40) })), async (c) => {
-    const r = await beginVoterAuth(getDb(c.env), await voterSecret(c), webauthn(c), pollId(c), c.req.valid("json"), now().getTime());
+    const body = c.req.valid("json");
+    // Per poll and student, whether or not the number is on the roll, so the limit itself reveals nothing about the roll.
+    const key = await studentKey(await deriveSecret(c.env.BETTER_AUTH_SECRET, "ratelimit-v1"), pollId(c), body.studentNumber);
+    if (!(await limiters(c.env).student.allow(key))) {
+      throw new DomainError("rate_limited_student", "Too many attempts for this student number. Wait a minute and try again.", 429);
+    }
+    const r = await beginVoterAuth(getDb(c.env), await voterSecret(c), webauthn(c), pollId(c), body, now().getTime());
     return c.json(r);
   });
 

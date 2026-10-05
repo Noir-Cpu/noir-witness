@@ -1,6 +1,6 @@
 # Privacy notice: WITNESS polls
 
-> **DRAFT.** Written from what the code actually stores. It is not legal advice. Before a real poll, fill in every `[bracket]`, have the society's information officer read it, and remove this box. Open decisions are listed at the end of this file.
+> **DRAFT.** Written from what the code actually stores. It is not legal advice. Before a real poll, fill in every highlighted placeholder, have the society's information officer read it, and remove this box. Open decisions are listed at the end of the source file, docs/PRIVACY-NOTICE.md.
 
 **Version:** 0.1 draft · **Last updated:** [date]
 
@@ -20,7 +20,7 @@
 | A **passkey** created on your device | To make sure the person voting is the person who first used that student number in this poll | We store the passkey's public key and an identifier. Your fingerprint, face or PIN never leaves your device and we never receive it. |
 | A record that **you voted**, with the **hour** (not the minute) | To stop anyone voting twice | Kept on the "who voted" side. It holds no choices. |
 | Your **choices**, with a random **receipt code** | To count the vote and let you check it was counted | Kept on the "what was voted" side with no name, student number, timestamp or reference to you. The two sides are deliberately not linked. |
-| Your **IP address and browser details** | These are seen by the hosting network (Cloudflare) when your device connects | WITNESS does not store them. Voter pages do not run analytics or error-reporting scripts. |
+| Your **IP address and browser details** | These are seen by the hosting network (Cloudflare) when your device connects. WITNESS also counts sign-in attempts per IP address, and per student number in a keyed hash that cannot be turned back into the number, for about a minute, to stop guessing attacks | WITNESS does not store them or write them to its database or logs. The counters are held by Cloudflare's rate limiter and expire. Voter pages (the invite link and the receipt check) load no analytics or error-reporting scripts at all. |
 
 ### If you are an organiser
 
@@ -41,20 +41,23 @@ This is how anyone can check the count. It does not include names, student numbe
 - **Cloudflare** (hosting and network). Data passes through and is processed on servers that may be outside South Africa.
 - **Neon** (database), in Frankfurt, Germany.
 - **GitHub** (organiser sign-in only).
-- Operational monitoring (Grafana Cloud for performance traces, Sentry for error reports) is used on organiser and public pages only, never on voting pages. They receive no ballot choices, student numbers or invite codes. [Confirm after the code change: voter and receipt-check pages load no analytics or error-reporting scripts.]
+- **Sentry** (error reports) and **PostHog** (counts of page views, without cookies) run in your browser on the organiser and public pages (home, results, this notice). They do **not** run on the voting page or the receipt-check page, so your invite code, student number and receipt never reach them. On the pages where they run, the part of the address after `?` or `#` is removed before anything is sent.
+- **Grafana Cloud** receives performance traces from the server. Each trace holds only the request type, the route pattern (for example `/api/vote/:pollId/start`), the status code and the time taken. Never an invite code, student number, receipt or choice.
+- Server-side error reports (Sentry) leave out request bodies, cookies and sign-in headers.
 
 Transferring data outside South Africa is covered by section 72 of POPIA: these providers are bound by contract and their regions have data-protection rules that are similar in purpose. [Society to confirm.]
 
 ## 5. How long we keep it
 
-- **Voter list, passkeys and "who voted" records:** erased [90] days after the poll closes, or earlier if the organiser clicks "Erase voter data". [Confirm the period.]
-- **Published ballots, totals and signature:** kept, anonymously, for as long as the result needs to be checkable.
+- **Voter list, passkeys and "who voted" records:** erased automatically [90] days after the poll closes (a daily job does this), or earlier if the organiser clicks "Erase voter data" on a closed poll. Erasing removes the hashed student numbers, the stored passkeys and the record of who voted. The organiser's poll page states the date. [Confirm the period.]
+- **Published ballots, totals and signature:** kept, anonymously, for as long as the result needs to be checkable. They are never erased by the above. The total number of eligible voters and the number who voted are part of the signed result and also stay.
+- **Records of the erasure:** the organiser's log notes that voter data was erased, when, and how many entries, with no names or numbers.
 - **Organiser account data and audit log:** until the organiser asks for deletion, or [2] years after their last poll, whichever comes first.
 - **Hosting logs:** short-lived and held by Cloudflare under its own terms.
 
 ## 6. Your rights
 
-You can ask us to tell you what we hold about you, to correct it, or to delete it, and you can object to its use. Because the database holds your student number only as a hash, we can answer a request only if you give us your number; we cannot look you up by name. Your ballot cannot be identified at all, by design, so we cannot tell you what you voted or remove one ballot.
+You can ask us to tell you what we hold about you, to correct it, or to delete it, and you can object to its use. Because the database holds your student number only as a hash, we can answer a request only if you give us your number; we cannot look you up by name. Once a poll's voter data has been erased there is nothing left to look up or correct. Your ballot cannot be identified at all, by design, so we cannot tell you what you voted or remove one ballot.
 
 Write to [email address]. If you are not satisfied, you may complain to the Information Regulator (South Africa): https://inforegulator.org.za (see the website for current contact details).
 
@@ -68,13 +71,15 @@ Write to [email address]. If you are not satisfied, you may complain to the Info
 
 ## 8. Security
 
-Connections use HTTPS. Student numbers are stored hashed. Choices and identities are stored apart. Secrets are held outside the code. No system is perfectly secure.
+Connections use HTTPS. Student numbers are stored hashed. Choices and identities are stored apart. Repeated sign-in attempts from one address or for one student number are slowed down. Secrets are held outside the code. No system is perfectly secure.
 
 ## Decisions needed before a real poll
 
+These are for the person publishing the notice and are not shown on the website.
+
 - [ ] Who is the responsible party: the society (recommended) or John personally? Put the name in section 1.
-- [ ] Name and contact for the information officer.
-- [ ] Retention period for the voter list and "who voted" records (draft says 90 days).
+- [ ] Name and contact for the information officer, and a privacy contact email.
+- [ ] Retention period for the voter list and "who voted" records. The notice says 90 days; the service reads `PURGE_DAYS` in `apps/api/wrangler.toml` (default 90). Make the two agree.
+- [ ] Replace every highlighted placeholder, remove the draft box, then run `PRIVACY_STRICT=1 npm test -w @noir/web` to check none is left.
 - [ ] Does the society have written permission to hold a student-number list and share it with the operator? (Needed from the organiser.)
-- [ ] Confirm that voter pages run no analytics or error scripts (needs the code change).
 - [ ] Have someone with POPIA experience read this once.
