@@ -3,6 +3,8 @@
   --danger: oklch(0.45 0.17 28);
   --ok: oklch(0.42 0.11 150);
   --warn-bg: oklch(0.93 0.05 85);
+  /* Dark text for use on fixed pale backgrounds; --ink flips to cream in dark mode. */
+  --ink-fixed: oklch(0.17 0.006 60);
   --line: var(--smoke);
   --tap: 3rem;
 }
@@ -55,7 +57,7 @@ form > button, .cards .button { width: 100%; }
 
 .alert { color: var(--danger); font-weight: 600; border-left: 4px solid var(--danger); padding-left: 0.75rem; margin: 0.5rem 0; }
 .ok { color: var(--ok); font-weight: 600; }
-.warning { background: var(--warn-bg); color: var(--ink); border-left: 4px solid var(--ink); padding: 0.75rem 1rem; }
+.warning { background: var(--warn-bg); color: var(--ink-fixed); border-left: 4px solid var(--ink-fixed); padding: 0.75rem 1rem; }
 
 .cards { display: grid; gap: 1rem; margin-top: 1.5rem; }
 .cards section { border: 2px solid var(--ink); padding: 0 1rem 1rem; }
@@ -90,7 +92,7 @@ table.tally { width: 100%; border-collapse: collapse; margin: 1rem 0; }
 .prose ul { padding-left: 1.25rem; }
 .prose li { margin: 0.25rem 0; }
 .prose a { overflow-wrap: anywhere; }
-mark.placeholder { background: oklch(0.9 0.14 95); color: var(--ink); outline: 2px dashed var(--ink); outline-offset: 1px; padding: 0 0.15em; }
+mark.placeholder { background: oklch(0.9 0.14 95); color: var(--ink-fixed); outline: 2px dashed var(--ink-fixed); outline-offset: 1px; padding: 0 0.15em; }
 table.stack { width: 100%; border-collapse: collapse; margin: 1rem 0; }
 table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 table.stack tr { display: block; border: 2px solid var(--ink); margin: 0 0 1rem; padding: 0.5rem 0.75rem; }

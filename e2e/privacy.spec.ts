@@ -112,3 +112,15 @@ test.describe("privacy notice", () => {
     await expect(page.getByLabel(/Invite code/)).toHaveValue(SECRET); // the form was not lost
   });
 });
+
+// Regression: the draft box and highlighted placeholders once used the theme's ink colour (cream in dark mode) on a
+// fixed pale background, which is unreadable. Axe must pass in both colour schemes.
+for (const scheme of ["light", "dark"] as const) {
+  test(`privacy notice has no contrast violations in ${scheme} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/privacy");
+    await expect(page.getByRole("heading", { name: "Privacy notice", level: 1 })).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag22aa"]).analyze();
+    expect(results.violations).toEqual([]);
+  });
+}
