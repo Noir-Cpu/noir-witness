@@ -32,7 +32,8 @@ await Promise.all(
     const v = i % voters;
     const res = await w.request(`/api/vote/${s.pollId}/cast`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${tokens[v]}` },
+      // A distinct address per voter: the per-address rate limit (ADR 0014) is not what this script measures.
+      headers: { "content-type": "application/json", authorization: `Bearer ${tokens[v]}`, "cf-connecting-ip": `10.${(v >> 16) & 255}.${(v >> 8) & 255}.${v & 255}` },
       body: JSON.stringify({ idempotencyKey: newKey(), selections: [{ questionId: s.questionId, optionId: s.optionIds[v % 2] }] }),
     });
     await res.arrayBuffer();

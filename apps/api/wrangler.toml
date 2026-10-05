@@ -12,5 +12,32 @@ run_worker_first = ["/api/*"]
 [observability]
 enabled = true
 
+# Daily retention job (ADR 0016): erases the identity side of polls closed more than PURGE_DAYS ago.
+# Uses 1 of the 5 cron triggers on the account (noir-dispatch uses another).
+[triggers]
+crons = ["17 3 * * *"]
+
+# Plain configuration, not a secret. Whole days after close; anything else falls back to 30.
+[vars]
+PURGE_DAYS = "30"
+
+# In-Worker rate limits for the voter endpoints (ADR 0014; app.ts `vote.use`, `/start`). Workers.dev has no zone, so a
+# dashboard rule is not possible. namespace_ids must be unique per account: noir-dispatch uses 1001.
+# Per client address (cf-connecting-ip): sized for a campus behind one NAT address.
+[[ratelimits]]
+name = "RATE_LIMIT_IP"
+namespace_id = "2001"
+  [ratelimits.simple]
+  limit = 600
+  period = 60
+
+# Per poll and student number (HMAC of the normalised number, never the number itself).
+[[ratelimits]]
+name = "RATE_LIMIT_STUDENT"
+namespace_id = "2002"
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
 # Secrets (wrangler secret put): DATABASE_URL, BETTER_AUTH_SECRET, SIGNING_KEY, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET.
 # Optional: BETTER_AUTH_URL, SENTRY_DSN_API, GRAFANA_OTLP_ENDPOINT, GRAFANA_OTLP_AUTH. See docs/SETUP.md.

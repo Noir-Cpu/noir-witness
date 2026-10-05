@@ -16,6 +16,6 @@ I implemented this with `@simplewebauthn/server` directly and did not reuse the 
 **Consequences.**
 - A student number is not a secret. Whoever knows the invite code and a member's number first can claim that member's slot and vote as them. The passkey stops a second person taking over afterwards; it does not prove the first person is the member. The organiser can clear a claim before that voter has voted (audited). The README states this.
 - A wrong code and an unknown student number return the identical error, so the roll cannot be probed without the code.
-- No rate limiting is built yet (see open leads).
+- Voter endpoints are rate limited per client address and per student number (ADR 0014).
 - The server-side ceremony is exercised by the Playwright test with Chromium's virtual authenticator, not by unit tests. Unit tests mint session tokens directly.
 - Session tokens sit in page memory, not storage. A reload means one more passkey tap.

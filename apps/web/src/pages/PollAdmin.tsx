@@ -18,7 +18,10 @@ type Detail = {
   turnout: number | null;
   smallElectorate: boolean;
   signedRoot: string | null;
+  retention: { days: number; erasesAt: string | null; erasedAt: string | null; erased: boolean };
 };
+
+const day = (iso: string) => new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
 
 export function PollAdmin({ id }: { id: string }) {
   const qc = useQueryClient();
@@ -28,6 +31,7 @@ export function PollAdmin({ id }: { id: string }) {
   const [notice, setNotice] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
+  const [confirmErase, setConfirmErase] = useState(false);
 
   if (detail.isPending) return <><Heading>Poll</Heading><p role="status">Loading…</p></>;
   if (detail.isError) return <><Heading>Poll</Heading><Alert>{errorText(detail.error)}</Alert><Link href="/organiser">Back to your polls</Link></>;
@@ -97,7 +101,7 @@ export function PollAdmin({ id }: { id: string }) {
       <section aria-labelledby="s-roll">
         <h2 id="s-roll">2. Voter roll</h2>
         <p>
-          {p.eligible} eligible voter{p.eligible === 1 ? "" : "s"}. {p.status === "open" || p.status === "closed" ? `${p.passkeysRegistered} have set up a passkey.` : ""}
+          {p.eligible} eligible voter{p.eligible === 1 ? "" : "s"}. {p.status === "open" || (p.status === "closed" && !p.retention.erased) ? `${p.passkeysRegistered} have set up a passkey.` : ""}
         </p>
         {p.smallElectorate && (
           <p className="warning" role="note">
@@ -174,6 +178,33 @@ export function PollAdmin({ id }: { id: string }) {
               Published. Share <Link href={`/results/${id}`}>{location.origin}/results/{id}</Link>. Members can check receipts at <Link href={`/verify?poll=${id}`}>the verify page</Link>.
             </p>
           )}
+        </section>
+      )}
+
+      {p.status === "closed" && (
+        <section aria-labelledby="s-ret">
+          <h2 id="s-ret">6. Voter data and retention</h2>
+          {p.retention.erased ? (
+            <p data-testid="retention-erased">
+              Voter data was erased{p.retention.erasedAt ? ` on ${day(p.retention.erasedAt)}` : ""}. The hashed student numbers, passkeys and the record of who voted are gone. The signed result and every ballot are kept, and the count still verifies.
+            </p>
+          ) : (
+            <>
+              <p data-testid="retention-notice">
+                The voter list, passkeys and record of who voted are erased automatically {p.retention.days} days after you close the poll{p.retention.erasesAt ? `, on ${day(p.retention.erasesAt)}` : ""}. The signed result and every ballot are kept, so the count stays checkable.
+              </p>
+              {!confirmErase ? (
+                <button type="button" className="secondary" disabled={busy} onClick={() => setConfirmErase(true)}>Erase voter data…</button>
+              ) : (
+                <div role="group" aria-label="Confirm erasing voter data">
+                  <p><strong>Erase voter data now?</strong> This deletes the hashed student numbers, passkeys and the record of who voted for this poll. It cannot be undone. Ballots and the signed result are not touched.</p>
+                  <button type="button" disabled={busy} onClick={() => act(() => post("/erase-voter-data"), "Voter data erased.").then(() => setConfirmErase(false))}>Yes, erase it</button>{" "}
+                  <button type="button" className="secondary" onClick={() => setConfirmErase(false)}>Keep it for now</button>
+                </div>
+              )}
+            </>
+          )}
+          <p className="hint">Read the <Link href="/privacy">privacy notice</Link> your voters see.</p>
         </section>
       )}
     </>

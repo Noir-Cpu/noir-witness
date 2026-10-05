@@ -1,6 +1,6 @@
 # CASE 001 / WITNESS
 
-**Verdict: a society can run an invite-only vote where each member votes once, gets a receipt, and anyone can recompute the count from one public file, provided they accept that the operator is trusted not to log who voted for what.** Not deployed yet (no database exists): the live link is empty. Status: MVP built and tested against in-process Postgres.
+**Verdict: a society can run an invite-only vote where each member votes once, gets a receipt, and anyone can recompute the count from one public file, provided they accept that the operator is trusted not to log who voted for what.** Live at https://noir-witness.noir-cpu.workers.dev (a push to `main` that passes CI deploys it). Status: MVP built and tested against in-process Postgres; the Neon and Workers behaviour is largely unmeasured (see the evidence table).
 
 ## The brief
 
@@ -24,14 +24,16 @@ All numbers below come from runs on this machine (Node 22.22.2, Linux) on 2026-0
 
 | Claim | Result | Command |
 | --- | --- | --- |
-| Unit and integration tests | 65 pass in `apps/api`, 17 in `packages/bulletin` | `npm test` |
+| Unit and integration tests | 97 pass in `apps/api`, 17 in `packages/bulletin`, 11 in `apps/web` (plus 1 skipped: the `PRIVACY_STRICT` check, which fails until the notice placeholders are filled in) | `npm test` |
 | No duplicate ballots under concurrent attempts | 1,000 attempts from 100 voters gave exactly 100 ballots and 100 participations | `npm run test:concurrency -w @noir/api` |
 | Property test (fast-check) | 200 generated runs, 9,454 cast attempts from 1,777 voters (in that run) gave 1,777 ballots and 1,777 participations; never more than one per voter; stored tally equals the winning attempts. Attempts per run vary with the random seed. | same |
 | Same, through the HTTP endpoint | 200 attempts from 20 voters gave 20 ballots | same |
 | A mutated cast statement is caught | Making the ballot insert ignore the participation result fails 4 tests | manual edit, reverted |
 | Verifier catches tampering | Changing one ballot, removing, adding or reordering ballots, or re-signing with another key each make `scripts/verify.ts` exit 1 | `npm test -w @noir/api` (`verify.test.ts`) |
 | Secrecy checks | 13 tests: table columns, no shared column but `poll_id`, foreign keys, hour buckets, sorted output, no voter ids in the published file | `secrecy.test.ts` |
-| End to end | 4 Playwright tests pass in Chromium, including passkey creation and re-authentication with a virtual authenticator, a ballot chosen and submitted from the keyboard (arrow keys and Enter), and axe (WCAG 2.2 AA tags) on the main voter, organiser, results and receipt-check screens. A manual screen-reader pass was not done | `npm run e2e` |
+| End to end | 10 Playwright tests pass in Chromium, including passkey creation and re-authentication with a virtual authenticator, a ballot chosen and submitted from the keyboard (arrow keys and Enter), and axe (WCAG 2.2 AA tags) on the main voter, organiser, results, receipt-check and privacy screens, the organiser erasing voter data and the result still verifying afterwards, a check that voter pages send nothing to Sentry or PostHog (fake keys, intercepted requests), and the rate-limit message. A manual screen-reader pass was not done | `npm run e2e` |
+| Rate limits | 600 per minute per address and 10 per minute per poll and student, with 300 students behind one address passing. In-memory limiter only: the Cloudflare binding has not been exercised | `ratelimit.test.ts` |
+| Erase and purge | Erasing voter data keeps ballots and bulletin byte-identical, the package and `scripts/verify.ts` still pass, open and recent polls are untouched, a second run is a no-op. PGlite only | `retention.test.ts` |
 | Cast latency, local | 700 casts at a paced 35/s: p50 4.2 ms, p95 6.5 ms, p99 7.1 ms. At an offered 1,000/s the process sustained about 577/s and latency climbed to p95 1,628 ms (queueing). **In-process Hono + PGlite, no network, one connection: not a production figure.** | `npx tsx scripts/load.ts` and `--rate 1000 --seconds 2` |
 | Close, local | Building and signing a bulletin for 2,000 ballots took 79 ms in Node. Not measured on Workers | ad hoc script |
 | Code coverage | not measured | |
@@ -66,7 +68,9 @@ node scripts/verify.ts bulletin.json --pubkey <public key from the organiser> --
 
 Node 22.18 or later runs the TypeScript file directly. Without `--pubkey` the script says the signer is unauthenticated.
 
-**Decisions** (each has an ADR in [docs/adr](docs/adr)): passkeys not fingerprints (0002), separate tables (0003), atomic cast (0004), no timing side channel (0005), Merkle commitment (0006), live results off (0007), voter authentication and why not Better Auth's passkey plugin (0008), receipts from idempotency keys (0009), the student-number roll (0010), independent verifier and key pinning (0011), close waits for casts (0012), manual invites and hidden turnout (0013).
+**Decisions** (each has an ADR in [docs/adr](docs/adr)): in-Worker rate limits (0014), no telemetry on voter pages (0015), erasing voter data and retention (0016), passkeys not fingerprints (0002), separate tables (0003), atomic cast (0004), no timing side channel (0005), Merkle commitment (0006), live results off (0007), voter authentication and why not Better Auth's passkey plugin (0008), receipts from idempotency keys (0009), the student-number roll (0010), independent verifier and key pinning (0011), close waits for casts (0012), manual invites and hidden turnout (0013).
+
+**Privacy.** Voter pages load no analytics or error reporting; the invite code lives in the URL fragment and never reaches a server or a log ([ADR 0015](docs/adr/0015-no-telemetry-on-voter-pages.md)). After a poll closes, the organiser can erase the voter list, passkeys and who-voted records, and a daily job does it after `PURGE_DAYS` (default 30); ballots and the signed bulletin stay and still verify ([ADR 0016](docs/adr/0016-erase-voter-data-and-retention.md)). The notice voters see is [docs/PRIVACY-NOTICE.md](docs/PRIVACY-NOTICE.md), served at `/privacy`; it is a draft with highlighted placeholders to fill in.
 
 **Run it locally** (no database needed):
 
@@ -96,11 +100,12 @@ Free tier covers the MVP as designed. At 10k daily users the PRD estimate stands
 
 ## Open leads
 
-- No rate limiting on `/vote/:id/start` yet. The 128-bit code protects the roll; a Cloudflare rate rule or Turnstile should sit in front before a real vote.
+- Rate limits exist ([ADR 0014](docs/adr/0014-in-worker-rate-limits.md)) but the Cloudflare binding has not been seen working on the live Worker. A code holder can lock one student out by spending their per-minute attempts. Turnstile is not used.
 - Never run against Neon. The `neon-http` driver path (`db.execute` result shape, relational queries) is untested; PGlite is the only database used so far.
 - Close-versus-cast locking needs a run on a Neon branch.
 - Per-member invite codes instead of one shared code and a guessable number.
 - Interim signed roots (ADR 0006 open question), blind signatures, ranked choice.
-- POPIA: privacy notice, retention job, written permission from the society. Not done.
+- POPIA: the privacy notice is drafted and served at `/privacy` but has unfilled placeholders (society, information officer, contact, date, retention period); written permission from the society is not in hand; nobody with POPIA experience has read it. Neon's point-in-time restore may keep erased rows for its restore window.
+- The daily purge handler (`scheduled` in `apps/api/src/index.ts`) and the erase SQL have not run on Neon or on a deployed Worker.
 - The receipt check in the browser needs Ed25519 in WebCrypto; older browsers will report a failed signature check.
 - The passkey ceremony is covered by Playwright only, not by unit tests.

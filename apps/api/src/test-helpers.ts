@@ -4,11 +4,12 @@ import { createPgliteDb } from "@noir/db/pglite";
 import { eligibleVoters, options, organisations, polls, questions, user, type Db } from "@noir/db";
 import { generateSigningKey } from "@noir/bulletin";
 import { createApp, type Env } from "./app";
+import type { VoterLimiters } from "./guards";
 import { deriveSecret, hashStudentNumber, randomHex, signToken } from "./domain/crypto";
 
 export const AUTH_SECRET = "test-secret-test-secret-test-secret-1234";
 
-export async function makeWorld(opts: { organiser?: string | null } = {}) {
+export async function makeWorld(opts: { organiser?: string | null; limiters?: VoterLimiters } = {}) {
   const db = await createPgliteDb();
   const key = await generateSigningKey();
   const env = { DATABASE_URL: "unused", BETTER_AUTH_SECRET: AUTH_SECRET, SIGNING_KEY: key.privateKey } as Env;
@@ -20,6 +21,7 @@ export async function makeWorld(opts: { organiser?: string | null } = {}) {
   const app = createApp({
     db,
     now: () => clock.now,
+    limiters: opts.limiters,
     organiser: async () => (organiserId ? { id: organiserId, name: organiserId } : null),
   });
   const request = (path: string, init?: RequestInit) => app.request(path, init, env);

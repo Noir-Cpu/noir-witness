@@ -1,6 +1,6 @@
 # Deploying WITNESS: what John must do
 
-Nothing below has been done. No database exists and nothing is deployed. Run everything from the repository root unless a step says otherwise. Do not paste secrets into chat, commits or issues.
+Steps 1 to 5 are the one-off first set-up. The service is deployed at https://noir-witness.noir-cpu.workers.dev and a push to `main` that passes CI deploys automatically, running the migrations against the real database first (step 7). Run everything from the repository root unless a step says otherwise. Do not paste secrets into chat, commits or issues.
 
 ## 1. Create the database (Neon, free tier)
 
@@ -68,57 +68,18 @@ Optional, same way: `SENTRY_DSN_API`, `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_OTLP_AUT
 
 ## 6. Before any real vote
 
-- Put a Cloudflare rate-limiting rule on `/api/vote/*/start` (or add Turnstile). No rate limit is built in.
+- **Rate limits are built in** (ADR 0014). Do not add a Cloudflare dashboard rate-limiting rule: those rules need a zone, and `workers.dev` has none. The limits are two Workers Rate Limiting bindings declared in `apps/api/wrangler.toml` and applied by `wrangler deploy`, so there is nothing to click: `RATE_LIMIT_IP` (namespace 2001, 600 requests per 60 s per client address) and `RATE_LIMIT_STUDENT` (namespace 2002, 10 per 60 s per poll and student number). Namespace ids must be unique within the Cloudflare account (noir-dispatch uses 1001). Check after the first deploy that the bindings show under the Worker's Settings, Bindings, and that a burst of requests to `/api/vote/<poll>/start` eventually returns 429.
+- **Retention is built in** (ADR 0016). A daily cron (03:17 UTC) erases the voter list, passkeys and who-voted records of polls closed more than `PURGE_DAYS` days ago. `PURGE_DAYS` is a plain variable in `apps/api/wrangler.toml` (`[vars]`), default 30, not a secret; change it there and push. The cron uses one of the account's five cron slots. Check in the Cloudflare dashboard (Worker, Settings, Triggers) that the cron is listed, and in the Worker logs that a `retention purge` line appears daily.
+- **Fill in the privacy notice** (`docs/PRIVACY-NOTICE.md`, shown at `/privacy`): the society's name, the information officer, a contact email, the date and the retention period. Placeholders in `[brackets]` show highlighted on the page. When done, set the repository variable `PRIVACY_STRICT` to `1` (Settings, Secrets and variables, Actions, Variables): CI then fails while any placeholder remains. Locally: `PRIVACY_STRICT=1 npm test -w @noir/web`.
 - Run the Neon-branch checks below.
-- Get written permission from the society and write a privacy notice (POPIA).
+- Get written permission from the society.
 
 **Neon branch checks:** create a branch of the project in Neon, point a copy of the dev environment at it, then (a) run the cast property test against it and (b) run a load test with k6 at 35 req/s against the deployed staging Worker. Neither has been done. The `neon-http` driver has never been exercised by this codebase.
 
-## 7. Restore the deploy workflow
+## 7. Automatic deploys
 
-The template's deploy workflow was removed because it needed a database. To restore it, add `.github/workflows/deploy.yml`:
+`.github/workflows/deploy.yml` runs after CI succeeds on a push to `main` (or by hand from the Actions tab): it builds the web app, runs `npm run migrate -w @noir/db` against the real database with `DATABASE_URL_DIRECT`, then `wrangler deploy`. Consequences to remember:
 
-```yaml
-name: Deploy
-on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-jobs:
-  deploy:
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with: { ref: "${{ github.event.workflow_run.head_sha }}" }
-      - uses: actions/setup-node@v7
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npm run build -w @noir/web
-        env:
-          VITE_SENTRY_DSN: ${{ vars.SENTRY_DSN_WEB }}
-          VITE_POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
-          VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
-      - run: npm run migrate -w @noir/db
-        env:
-          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
-      - run: npx wrangler deploy
-        working-directory: apps/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-```
-
-Repository secrets it needs (values from you, not from this file):
-
-```
-gh secret set DATABASE_URL_DIRECT -R Noir-Cpu/noir-witness
-gh secret set CLOUDFLARE_API_TOKEN -R Noir-Cpu/noir-witness      # token with "Edit Cloudflare Workers"
-gh secret set CLOUDFLARE_ACCOUNT_ID -R Noir-Cpu/noir-witness
-```
-
-Worker secrets from step 4 live on Cloudflare, not in GitHub. The workflow's migration step runs on every deploy; migrations are additive files, so re-running is safe.
+- Every push to `main` goes live. Work on a branch and merge a pull request only when CI is green.
+- A new migration file runs against production data on the next deploy. Keep migrations additive. The privacy and rate-limit work added none.
+- Repository secrets it needs: `DATABASE_URL_DIRECT`, `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers"), `CLOUDFLARE_ACCOUNT_ID`. Optional repository variables for the web build: `SENTRY_DSN_WEB`, `POSTHOG_KEY`, `POSTHOG_HOST`. Worker secrets from step 4 live on Cloudflare, not in GitHub.

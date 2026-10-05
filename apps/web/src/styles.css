@@ -82,3 +82,26 @@ table.tally { width: 100%; border-collapse: collapse; margin: 1rem 0; }
   form > button, .cards .button { width: auto; justify-self: start; }
   .cards { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Privacy notice and other long text. Tables become stacked label/value rows on a phone. */
+.prose { max-width: 40rem; }
+.prose h2 { margin-top: 2rem; }
+.prose h3 { font-size: 1.0625rem; margin: 1.25rem 0 0.5rem; }
+.prose ul { padding-left: 1.25rem; }
+.prose li { margin: 0.25rem 0; }
+.prose a { overflow-wrap: anywhere; }
+mark.placeholder { background: oklch(0.9 0.14 95); color: var(--ink); outline: 2px dashed var(--ink); outline-offset: 1px; padding: 0 0.15em; }
+table.stack { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+table.stack tr { display: block; border: 2px solid var(--ink); margin: 0 0 1rem; padding: 0.5rem 0.75rem; }
+table.stack th, table.stack td { display: block; text-align: left; padding: 0.25rem 0; }
+table.stack th[scope="row"] { font-weight: 700; }
+table.stack td::before { content: attr(data-label); display: block; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75rem; color: var(--graphite); }
+@media (min-width: 40rem) {
+  table.stack tr { display: table-row; border: 0; margin: 0; padding: 0; }
+  table.stack thead { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  table.stack th, table.stack td { display: table-cell; padding: 0.5rem 0.75rem 0.5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.stack td::before { display: none; }
+}
+footer nav { margin-top: 0.5rem; }
+footer nav a { min-height: 2.75rem; display: inline-flex; align-items: center; }

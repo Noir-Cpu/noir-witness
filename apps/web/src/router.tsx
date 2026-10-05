@@ -7,6 +7,12 @@ export function navigate(to: string) {
   listeners.forEach((l) => l());
 }
 
+// For code outside React (telemetry) that must react to every client-side navigation.
+export function onNavigate(fn: () => void) {
+  listeners.add(fn);
+  window.addEventListener("popstate", fn);
+}
+
 export function useLocation() {
   const [, tick] = useState(0);
   useEffect(() => {

@@ -28,6 +28,9 @@ export function Layout({ children }: { children: ReactNode }) {
         <p>
           For societies, clubs and meetings. Not for public or government elections. Keeping a receipt lets you prove how you voted.
         </p>
+        <nav aria-label="Footer">
+          <Link href="/privacy">Privacy notice</Link>
+        </nav>
       </footer>
     </>
   );
