@@ -16,6 +16,9 @@ async function watch(page: Page) {
   });
   return seen;
 }
+const hostOf = (r: { url: string }) => new URL(r.url).hostname;
+const sentSentry = (seen: { url: string }[]) => seen.some((r) => hostOf(r).endsWith(".sentry.io"));
+const sentPosthog = (seen: { url: string }[]) => seen.some((r) => hostOf(r).endsWith(".posthog.com"));
 const boom = (page: Page) => page.evaluate(() => void setTimeout(() => { throw new Error("test error"); }, 0));
 
 test("control: public pages do send telemetry to the configured hosts, with no fragment or query", async ({ page }) => {
@@ -23,8 +26,8 @@ test("control: public pages do send telemetry to the configured hosts, with no f
   await page.goto(`/#code=${SECRET}`);
   await expect(page.getByRole("heading", { name: "Votes you can check" })).toBeVisible();
   await boom(page);
-  await expect.poll(() => seen.some((r) => r.url.includes("sentry.io")), { timeout: 10_000 }).toBe(true);
-  await expect.poll(() => seen.some((r) => r.url.includes("posthog.com")), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => sentSentry(seen), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => sentPosthog(seen), { timeout: 10_000 }).toBe(true);
   // What was sent never contains the fragment.
   for (const r of seen) {
     expect(r.url).not.toContain(SECRET);
@@ -56,7 +59,7 @@ test("the receipt-check page sends nothing either, including its query string", 
 test("navigating from a public page into a voter page stops capturing", async ({ page }) => {
   const seen = await watch(page);
   await page.goto("/");
-  await expect.poll(() => seen.some((r) => r.url.includes("posthog.com")), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => sentPosthog(seen), { timeout: 10_000 }).toBe(true);
   await page.getByRole("link", { name: "Check a receipt" }).first().click();
   await expect(page).toHaveURL(/\/verify$/);
   await page.waitForTimeout(500);
