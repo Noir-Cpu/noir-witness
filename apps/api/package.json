@@ -11,15 +11,15 @@
     "test:concurrency": "vitest run src/domain/cast.test.ts --disableConsoleIntercept"
   },
   "dependencies": {
-    "@better-auth/passkey": "^1.7.6",
+    "@better-auth/passkey": "^1.7.7",
     "@hono/zod-validator": "^0.9.1",
     "@noir/bulletin": "*",
     "@noir/db": "*",
-    "@sentry/cloudflare": "^11.1.0",
+    "@sentry/cloudflare": "^11.4.0",
     "@simplewebauthn/server": "^13.3.3",
     "better-auth": "^1.7.6",
     "drizzle-orm": "^0.45.3",
-    "hono": "^4.6.0",
+    "hono": "^4.13.12",
     "zod": "^4"
   },
   "devDependencies": {
@@ -27,7 +27,7 @@
     "@hono/node-server": "^2.1.3",
     "fast-check": "^4.10.2",
     "tsx": "^4.23.15",
-    "vitest": "^5",
-    "wrangler": "^4.143.0"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.147.0"
   }
 }
