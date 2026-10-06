@@ -160,6 +160,7 @@ export function Vote({ id }: { id: string }) {
         <form onSubmit={begin}>
           <Field
             label="Invite code"
+            name="invite-code"
             hint="It is already filled in if you used your invite link."
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -171,6 +172,7 @@ export function Vote({ id }: { id: string }) {
           />
           <Field
             label="Student number"
+            name="student-number"
             hint="As it appears on your student card."
             value={studentNumber}
             onChange={(e) => setStudentNumber(e.target.value)}
@@ -265,7 +267,7 @@ export function Vote({ id }: { id: string }) {
       {receipt ? (
         <>
           <p>Your ballot is recorded. This is your receipt. Copy it or take a screenshot now: once results are published you can use it to check that your ballot was counted.</p>
-          <p className="receipt" data-testid="receipt">{receipt}</p>
+          <p className="receipt" data-testid="receipt" translate="no">{receipt}</p>
           <CopyButton text={receipt} label="Copy receipt" />
           <p className="hint">
             The receipt is saved on this device. It does not say how you voted, but anyone who sees it together with the published results can find your ballot, so do not share it if your vote is private.

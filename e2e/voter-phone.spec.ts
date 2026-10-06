@@ -208,3 +208,39 @@ test("the receipt check page is usable at 320px and its fields have separate nam
   await expect(receipt).toHaveAccessibleDescription(/Leave blank/);
   await axe(page);
 });
+
+// Axe in both colour schemes on every screen a voter or organiser sees, not just the privacy notice.
+for (const scheme of ["light", "dark"] as const) {
+  test(`axe passes on every voter and organiser screen in ${scheme} mode`, async ({ page, request, context }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await withAuthenticator(context, page);
+    const poll = await openPoll(request, { voters: ["S3600001", "S3600002", "S3600003"], title: `Contrast ${scheme}` });
+    for (const path of ["/", "/privacy", "/verify", "/organiser", `/organiser/polls/${poll.id}`, "/no-such-page"]) {
+      await page.goto(path);
+      await expect(page.locator("h1")).toBeVisible();
+      await axe(page);
+    }
+    await page.goto(poll.link);
+    await axe(page);
+    await page.getByLabel("Student number").fill("S9999999"); // an error state
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("alert")).toBeVisible();
+    await axe(page);
+    await page.getByLabel("Student number").fill("S3600001");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await axe(page);
+    await page.getByRole("button", { name: "Create passkey" }).click();
+    await page.getByRole("radio", { name: "Ada" }).check();
+    await axe(page);
+    await page.getByRole("button", { name: "Review my vote" }).click();
+    await axe(page);
+    await page.getByRole("button", { name: "Cast my vote" }).click();
+    await expect(page.getByRole("heading", { name: "Your vote is in" })).toBeVisible();
+    await axe(page);
+    await request.post(`/api/organiser/polls/${poll.id}/close`);
+    await request.post(`/api/organiser/polls/${poll.id}/publish`);
+    await page.goto(`/results/${poll.id}`);
+    await expect(page.getByText(/recomputed the tally/)).toBeVisible();
+    await axe(page);
+  });
+}

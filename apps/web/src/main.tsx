@@ -11,15 +11,17 @@ import { useLocation } from "./router";
 import { Layout } from "./ui";
 import { Home } from "./pages/Home";
 import { Vote } from "./pages/Vote";
+// Small pages that a voter reaches from the voter flow (notice, receipt check, results) load with the app: fetching them
+// on demand made the page jump when they arrived (measured CLS 0.100 on the receipt page against 0.001).
+import { Privacy } from "./pages/Privacy";
+import { Verify } from "./pages/Verify";
+import { Results } from "./pages/Results";
 
 initTelemetry();
 
-// A voter's phone needs React and the voter page. Organiser screens, receipt checking (which carries the bulletin
-// verifier) and the privacy notice are separate chunks, fetched when their page is opened.
+// A voter's phone needs React and the voter-facing pages. The organiser screens (data fetching, the sign-in client, poll
+// management) are one chunk that voters never download.
 const OrganiserArea = lazy(() => import("./pages/OrganiserArea"));
-const Verify = lazy(() => import("./pages/Verify").then((m) => ({ default: m.Verify })));
-const Results = lazy(() => import("./pages/Results").then((m) => ({ default: m.Results })));
-const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
 
 function Routes() {
   const { path } = useLocation();
@@ -42,7 +44,7 @@ function Routes() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Layout>
-      <Suspense fallback={<p role="status">Loading…</p>}>
+      <Suspense fallback={<p role="status" className="route-pending">Loading…</p>}>
         <Routes />
       </Suspense>
     </Layout>

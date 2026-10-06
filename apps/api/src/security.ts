@@ -13,7 +13,7 @@ export const HSTS = "max-age=31536000; includeSubDomains";
 export const PERMISSIONS_POLICY =
   "publickey-credentials-get=(self), publickey-credentials-create=(self), " +
   "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), serial=(), hid=(), " +
-  "accelerometer=(), gyroscope=(), magnetometer=(), midi=(), display-capture=(), interest-cohort=()";
+  "accelerometer=(), gyroscope=(), magnetometer=(), midi=(), display-capture=()";
 
 export const API_HEADERS: Record<string, string> = {
   "content-security-policy": API_CSP,

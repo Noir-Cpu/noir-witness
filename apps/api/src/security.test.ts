@@ -162,6 +162,33 @@ describe("CSRF on organiser writes", () => {
   });
 });
 
+describe("organiser session cookie", () => {
+  it("is __Secure-prefixed, Secure, HttpOnly and SameSite=Lax on the sign-in flow, and is not set by anonymous reads", async () => {
+    const { createPgliteDb } = await import("@noir/db/pglite");
+    const app = createApp({ db: await createPgliteDb() });
+    const url = "https://witness.example.org";
+    const env = { DATABASE_URL: "x", BETTER_AUTH_SECRET: AUTH_SECRET, BETTER_AUTH_URL: url, GITHUB_CLIENT_ID: "id", GITHUB_CLIENT_SECRET: "secret" } as Env;
+    const res = await app.request(`${url}/api/auth/sign-in/social`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: url, "sec-fetch-site": "same-origin" },
+      body: JSON.stringify({ provider: "github", callbackURL: "/organiser" }),
+    }, env);
+    expect(res.status).toBe(200);
+    const cookies = res.headers.getSetCookie();
+    expect(cookies.length).toBeGreaterThan(0);
+    for (const c of cookies) {
+      expect(c).toMatch(/^__Secure-/);
+      expect(c).toMatch(/;\s*Secure/i);
+      expect(c).toMatch(/;\s*HttpOnly/i);
+      expect(c).toMatch(/;\s*SameSite=Lax/i);
+      expect(c).not.toMatch(/Domain=/i);
+    }
+    const anon = await app.request(`${url}/api/me`, {}, env);
+    expect(anon.headers.getSetCookie()).toEqual([]);
+    expect(anon.status).toBe(401);
+  });
+});
+
 describe("input size limits", () => {
   it("rejects an oversized JSON body on voter and organiser routes with 413, before parsing it", async () => {
     const w = await makeWorld();
@@ -258,6 +285,24 @@ describe("error responses do not leak internals", () => {
       expect(JSON.parse(text)).toEqual({ error: "internal", message: "Something went wrong" });
       expect(text).not.toMatch(/hunter2|neon|postgres|select|at \w+ \(|\.ts:/i);
     }
+  });
+
+  it("logs from an unexpected failure on a non-voter route keep no credentials, and none at all on voter routes", async () => {
+    const lines: string[] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => void lines.push(a.map(String).join(" "));
+    try {
+      const app = createApp({ db: () => { throw new Error("connect failed postgres://admin:hunter2@ep-x.neon.tech/db?sslmode=require"); } });
+      const env = { DATABASE_URL: "x", BETTER_AUTH_SECRET: AUTH_SECRET } as Env;
+      await app.request("/api/polls/11111111-1111-4111-8111-111111111111", {}, env);
+      await app.request("/api/vote/11111111-1111-4111-8111-111111111111/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: "c".repeat(22), studentNumber: "S1" }) }, env);
+    } finally {
+      console.error = orig;
+    }
+    expect(lines.length).toBe(2);
+    expect(lines.join("\n")).not.toMatch(/hunter2|admin:/);
+    expect(lines[0]).toContain("ep-x.neon.tech"); // the host is kept: useful, and not a secret
+    expect(lines[1]).not.toContain("neon");
   });
 
   it("a malformed id in an organiser path is a 404, not a 500", async () => {

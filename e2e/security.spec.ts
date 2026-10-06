@@ -28,11 +28,10 @@ test.describe("response headers", () => {
     }
   });
 
-  test("private pages are noindex and not cached; public pages are indexable", async ({ request }) => {
+  test("private pages are noindex; public pages are indexable", async ({ request }) => {
     for (const path of [`/vote/${POLL}`, "/organiser", "/organiser/polls/" + POLL, "/verify", `/results/${POLL}`]) {
       const h = (await request.get(path)).headers();
       expect(h["x-robots-tag"], path).toContain("noindex");
-      expect(h["cache-control"], path).toBe("no-store");
     }
     for (const path of ["/", "/privacy", "/robots.txt", "/sitemap.xml"]) {
       expect((await request.get(path)).headers()["x-robots-tag"], path).toBeUndefined();

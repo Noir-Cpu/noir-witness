@@ -8,6 +8,13 @@
   --line: var(--smoke);
   --tap: 3rem;
 }
+/* Error and success text must stay readable on the dark background (the light-mode values were 2.3:1 there). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --danger: oklch(0.76 0.15 28);
+    --ok: oklch(0.8 0.14 150);
+  }
+}
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bone); color: var(--ink); font-family: var(--font-body); font-size: 1rem; line-height: 1.5; }
 a { color: var(--ink); text-underline-offset: 0.2em; }
@@ -111,3 +118,10 @@ footer nav a { min-height: 2.75rem; display: inline-flex; align-items: center; }
 .field { display: grid; gap: 0.25rem; }
 .field label { font-weight: 600; }
 a.tap { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+/* Touch: no double-tap-to-zoom delay on controls, and a deliberate tap highlight instead of the browser's default. */
+a, button, input, label, summary { touch-action: manipulation; -webkit-tap-highlight-color: oklch(0.58 0.2 28 / 0.2); }
+h1 { text-wrap: balance; }
+
+/* While a route's code is on its way, hold some height so the footer does not jump far when the page arrives. */
+.route-pending { min-height: 40vh; margin: 0; }

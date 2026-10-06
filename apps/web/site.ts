@@ -66,8 +66,9 @@ export function headersFile(connect: string[] = []): string {
     "Cross-Origin-Resource-Policy": "same-origin",
   });
   // Cloudflare adds the headers of every matching rule together, so a header must appear in one rule only.
+  // (The page shells hold no secrets and stay cacheable, which keeps the browser's back/forward cache working.)
   for (const p of NOINDEX_PATHS) {
-    block(p, { "X-Robots-Tag": "noindex, nofollow, noarchive", "Cache-Control": "no-store" });
+    block(p, { "X-Robots-Tag": "noindex, nofollow, noarchive" });
   }
   block("/assets/*", { "Cache-Control": "public, max-age=31536000, immutable" });
   return blocks.join("\n\n") + "\n";

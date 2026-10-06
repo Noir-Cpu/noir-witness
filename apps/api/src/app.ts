@@ -41,6 +41,9 @@ export type Deps = {
 
 const uuid = z.string().uuid();
 
+// A driver error can quote the connection string. Keep the host and drop the credentials, in case it reaches a log.
+const redact = (text: string) => text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^@\s/]*@/gi, "$1***@");
+
 export function createApp(deps: Deps = {}) {
   const app = new Hono<{ Bindings: Env }>().basePath("/api");
   const now = deps.now ?? (() => new Date());
@@ -106,7 +109,7 @@ export function createApp(deps: Deps = {}) {
     // Voter routes carry invite codes and student numbers in request bodies; an error message could echo them, so only
     // the error class is logged there (ADR 0015). Elsewhere a truncated message helps debugging.
     const voter = c.req.path.startsWith("/api/vote/");
-    console.error(JSON.stringify({ level: "error", msg: "unhandled", err: err.name, ...(voter ? {} : { detail: String(err.message).slice(0, 200) }) }));
+    console.error(JSON.stringify({ level: "error", msg: "unhandled", err: err.name, ...(voter ? {} : { detail: redact(String(err.message)).slice(0, 200) }) }));
     return c.json({ error: "internal", message: "Something went wrong" }, 500);
   });
 
