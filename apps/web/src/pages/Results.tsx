@@ -3,7 +3,7 @@ import { verifyBulletin, type Bulletin, type Check } from "@noir/bulletin";
 import { api, ApiError, errorText } from "../api";
 import { Link } from "../router";
 import { Alert, Heading } from "../ui";
-import { TallyTable } from "./PollAdmin";
+import { TallyTable } from "./Tally";
 
 export function Results({ id }: { id: string }) {
   const [bulletin, setBulletin] = useState<Bulletin | null>(null);

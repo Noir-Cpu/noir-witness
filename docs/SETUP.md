@@ -76,6 +76,25 @@ Optional, same way: `SENTRY_DSN_API`, `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_OTLP_AUT
 
 **Neon branch checks:** create a branch of the project in Neon, point a copy of the dev environment at it, then (a) run the cast property test against it and (b) run a load test with k6 at 35 req/s against the deployed staging Worker. Neither has been done. The `neon-http` driver has never been exercised by this codebase.
 
+## 6b. Limit who can organise (optional, recommended before a real vote)
+
+By default any GitHub user who signs in can create polls. To allow only named people, set `ORGANISERS_ALLOWED_GITHUB_IDS` to their numeric GitHub ids, comma-separated (ADR 0018). The id is a number, not the login name:
+
+```
+gh api users/<login> --jq .id                       # for each organiser
+cd apps/api
+echo -n "1234567,7654321" | npx wrangler secret put ORGANISERS_ALLOWED_GITHUB_IDS
+```
+
+Changes apply to the next request; no deploy is needed. Everyone else gets "This deployment only allows approved organisers." To go back to open sign-in, `npx wrangler secret delete ORGANISERS_ALLOWED_GITHUB_IDS`. A value with no usable number (a typo, a login name) approves nobody. Check by signing in as an organiser after setting it.
+
+## 6a. Security headers, telemetry and indexing (ADR 0017)
+
+- Pages carry a strict Content-Security-Policy (`connect-src 'self'`). If you later set the repository variables `SENTRY_DSN_WEB` or `POSTHOG_KEY` (and `POSTHOG_HOST`), the build adds exactly those ingest hosts to `connect-src`; nothing else changes. A host not set at build time is blocked by the browser.
+- Optional repository variable `VITE_SITE_URL` is not needed on `workers.dev`. Set it (no trailing slash) if the app moves to its own domain, so the canonical links, `robots.txt` and `sitemap.xml` use the new address, and change `BETTER_AUTH_URL` to match: the organiser write check compares the browser's `Origin` with it.
+- After a deploy, check the live headers: `curl -sI https://noir-witness.noir-cpu.workers.dev/ | grep -i -E 'content-security|strict-transport|x-content|referrer|permissions|cross-origin'`, and `curl -sI https://noir-witness.noir-cpu.workers.dev/api/health`.
+- Recommended repository settings (not changed by the code): protect `main` (require a pull request and the `check`, `e2e` and `gitleaks` jobs, no force pushes), because every push to `main` deploys and migrates; enable Dependabot alerts and security updates; consider requiring a reviewer on a `production` environment for the deploy job. Dependabot pull requests merge to `main` and therefore deploy: turn auto-merge off for the days around a real vote.
+
 ## 7. Automatic deploys
 
 `.github/workflows/deploy.yml` runs after CI succeeds on a push to `main` (or by hand from the Actions tab): it builds the web app, runs `npm run migrate -w @noir/db` against the real database with `DATABASE_URL_DIRECT`, then `wrangler deploy`. Consequences to remember:

@@ -3,7 +3,7 @@ import { verifyBulletin, proveReceipt, type Bulletin, type Check } from "@noir/b
 import { api, ApiError, errorText } from "../api";
 import { useLocation } from "../router";
 import { forgetReceipts, savedReceipts } from "../receipts";
-import { Alert, Heading } from "../ui";
+import { Alert, Field, Heading } from "../ui";
 
 type Outcome = { checks: Check[]; found: null | { ok: boolean; position: number; size: number; labels: string[] } };
 
@@ -71,8 +71,8 @@ export function Verify() {
         </section>
       )}
       <form onSubmit={submit}>
-        <label>Poll ID<span className="hint">In the results link your organiser shared.</span><input value={pollId} onChange={(e) => setPollId(e.target.value)} required spellCheck={false} autoComplete="off" /></label>
-        <label>Receipt<span className="hint">Leave blank to check the whole count without a receipt.</span><input value={receipt} onChange={(e) => setReceipt(e.target.value)} spellCheck={false} autoComplete="off" /></label>
+        <Field label="Poll ID" name="poll-id" hint="In the results link your organiser shared." value={pollId} onChange={(e) => setPollId(e.target.value)} required spellCheck={false} autoComplete="off" />
+        <Field label="Receipt" name="receipt" hint="Leave blank to check the whole count without a receipt." value={receipt} onChange={(e) => setReceipt(e.target.value)} spellCheck={false} autoComplete="off" />
         <Alert>{error}</Alert>
         <button type="submit" disabled={busy}>{busy ? "Checking…" : "Check"}</button>
       </form>
@@ -92,7 +92,7 @@ export function Verify() {
             ))}
           </ul>
           <p className="hint">
-            The signature check proves the file matches what the server signed, not who the signer is. Compare the key with the one published by your organiser: <code>{result.bulletin.publicKey}</code>. To check without trusting this page, run <code>node scripts/verify.ts bulletin.json --receipt …</code> from the source repository.
+            The signature check proves the file matches what the server signed, not who the signer is. Compare the key with the one published by your organiser: <code translate="no">{result.bulletin.publicKey}</code>. To check without trusting this page, run <code>node scripts/verify.ts bulletin.json --receipt …</code> from the source repository.
           </p>
         </section>
       )}

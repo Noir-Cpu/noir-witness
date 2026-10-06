@@ -115,14 +115,15 @@ describe("organiser API", () => {
     expect(big.smallElectorate).toBe(false);
   });
 
-  it("resets a passkey only for a voter who has not voted, and logs it", async () => {
+  it("resets a passkey, and logs the request without a student number or an outcome", async () => {
     const e = await runElection(w, { voters: 12, votes: 1 });
-    const voted = await j(`/api/organiser/polls/${e.pollId}/voters/reset`, "POST", { studentNumber: e.voters[0]!.number });
-    expect(voted.status).toBe(409);
     await w.db.update(eligibleVoters).set({ credentialId: "abc", credentialPublicKey: "k", credentialCounter: 0 }).where(eq(eligibleVoters.id, e.voters[5]!.id));
     expect((await j(`/api/organiser/polls/${e.pollId}/voters/reset`, "POST", { studentNumber: e.voters[5]!.number })).status).toBe(200);
     expect((await w.db.query.eligibleVoters.findFirst({ where: eq(eligibleVoters.id, e.voters[5]!.id) }))?.credentialId).toBeNull();
-    expect(await w.db.query.auditEvents.findFirst({ where: and(eq(auditEvents.pollId, e.pollId), eq(auditEvents.action, "voter.passkey_reset")) })).toBeTruthy();
+    const rows = await w.db.query.auditEvents.findMany({ where: and(eq(auditEvents.pollId, e.pollId), eq(auditEvents.action, "voter.passkey_reset_requested")) });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.detail).toEqual({});
+    expect(JSON.stringify(rows[0])).not.toContain(e.voters[5]!.number);
   });
 
   it("serves the public signing key", async () => {

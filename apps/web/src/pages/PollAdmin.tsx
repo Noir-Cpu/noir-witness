@@ -4,6 +4,7 @@ import type { Bulletin } from "@noir/bulletin";
 import { api, errorText } from "../api";
 import { Link } from "../router";
 import { Alert, CopyButton, Heading } from "../ui";
+import { TallyTable } from "./Tally";
 
 type Detail = {
   id: string;
@@ -233,7 +234,7 @@ function ResetPasskey({ id, disabled }: { id: string; disabled: boolean }) {
     e.preventDefault();
     try {
       await api(`/organiser/polls/${id}/voters/reset`, { method: "POST", json: { studentNumber: number } });
-      setMsg("Passkey cleared. That student can register again.");
+      setMsg("Done. If that number is on the roll, its passkey is cleared and the student can register again. This page does not say more, so that it cannot be used to find out who has voted.");
       setNumber("");
     } catch (err) {
       setMsg(errorText(err));
@@ -255,32 +256,4 @@ function Results({ id }: { id: string }) {
   const b = useQuery({ queryKey: ["org-bulletin", id], queryFn: () => api<Bulletin>(`/organiser/polls/${id}/bulletin`) });
   if (!b.data) return <p role="status">Loading result…</p>;
   return <TallyTable bulletin={b.data} />;
-}
-
-export function TallyTable({ bulletin }: { bulletin: Bulletin }) {
-  return (
-    <>
-      {bulletin.poll.questions.map((q) => {
-        const total = Object.values(bulletin.tally[q.id] ?? {}).reduce((a, n) => a + n, 0);
-        return (
-          <table key={q.id} className="tally">
-            <caption>{q.prompt}</caption>
-            <thead><tr><th scope="col">Option</th><th scope="col">Votes</th><th scope="col"><span className="sr">Share</span></th></tr></thead>
-            <tbody>
-              {q.options.map((o) => {
-                const n = bulletin.tally[q.id]?.[o.id] ?? 0;
-                return (
-                  <tr key={o.id}>
-                    <th scope="row">{o.label}</th>
-                    <td>{n}</td>
-                    <td aria-hidden="true"><span className="bar-fill" style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        );
-      })}
-    </>
-  );
 }

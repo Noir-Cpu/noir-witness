@@ -16,7 +16,14 @@ export type SessionToken = TokenPayload & { k: "session"; v: string; p: string }
 
 export type WebAuthnConfig = { rpID: string; origin: string; rpName: string };
 
-const noMatch = () => new DomainError("no_match", "Those details do not match this poll", 403);
+const noMatch = () => new DomainError("no_match", "Those details do not match this poll. Check your student number, and that you opened the whole invite link.", 403);
+
+// True only for the poll's current invite code. Used to decide whether a request counts against a student's rate limit.
+export async function inviteCodeMatches(db: Db, pollId: string, code: string) {
+  const poll = await db.query.polls.findFirst({ where: eq(polls.id, pollId), columns: { inviteHash: true } });
+  const given = await hashInviteCode(code);
+  return Boolean(poll?.inviteHash) && timingSafeEqualHex(given, poll!.inviteHash!);
+}
 
 // Step 1: invite code and student number. The same error covers a wrong code and a number not on the roll, so the
 // endpoint cannot be used to test who is on the roll without the code.

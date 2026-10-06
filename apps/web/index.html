@@ -3,11 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WITNESS: verifiable polls</title>
-    <meta name="description" content="Invite-only polls with one ballot per voter, a receipt for every vote, and a tally anyone can recompute." />
+    <title>WITNESS: verifiable polls for societies and clubs</title>
+    <meta name="description" content="Invite-only polls for societies and clubs. One ballot per voter, a receipt for every vote, and a tally anyone can recompute from one public file." />
+    <link rel="canonical" href="%SITE_URL%/" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#efebe2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#110f0d" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WITNESS" />
+    <meta property="og:title" content="WITNESS: verifiable polls for societies and clubs" />
+    <meta property="og:description" content="Invite-only polls for societies and clubs. One ballot per voter, a receipt for every vote, and a tally anyone can recompute from one public file." />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:image" content="%SITE_URL%/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="WITNESS: votes you can check" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "WITNESS",
+        "url": "%SITE_URL%/",
+        "description": "Invite-only polls for societies and clubs. One ballot per voter, a receipt for every vote, and a tally anyone can recompute from one public file.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Any modern web browser",
+        "image": "%SITE_URL%/og.png"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p>WITNESS runs in your browser and needs JavaScript. It checks your passkey and verifies results on your own device.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
