@@ -1,6 +1,5 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@fontsource-variable/archivo/wdth.css";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/600.css";
@@ -11,23 +10,23 @@ import { initTelemetry } from "./telemetry";
 import { useLocation } from "./router";
 import { Layout } from "./ui";
 import { Home } from "./pages/Home";
-import { Organiser } from "./pages/Organiser";
-import { PollAdmin } from "./pages/PollAdmin";
 import { Vote } from "./pages/Vote";
-import { Verify } from "./pages/Verify";
-import { Results } from "./pages/Results";
-import { Privacy } from "./pages/Privacy";
 
 initTelemetry();
 
-const client = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
+// A voter's phone needs React and the voter page. Organiser screens, receipt checking (which carries the bulletin
+// verifier) and the privacy notice are separate chunks, fetched when their page is opened.
+const OrganiserArea = lazy(() => import("./pages/OrganiserArea"));
+const Verify = lazy(() => import("./pages/Verify").then((m) => ({ default: m.Verify })));
+const Results = lazy(() => import("./pages/Results").then((m) => ({ default: m.Results })));
+const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
 
 function Routes() {
   const { path } = useLocation();
   let m: RegExpMatchArray | null;
   if (path === "/") return <Home />;
-  if (path === "/organiser") return <Organiser />;
-  if ((m = path.match(/^\/organiser\/polls\/([0-9a-f-]{36})$/))) return <PollAdmin id={m[1]!} key={m[1]} />;
+  if (path === "/organiser") return <OrganiserArea />;
+  if ((m = path.match(/^\/organiser\/polls\/([0-9a-f-]{36})$/))) return <OrganiserArea id={m[1]!} key={m[1]} />;
   if ((m = path.match(/^\/vote\/([0-9a-f-]{36})$/))) return <Vote id={m[1]!} key={m[1]} />;
   if ((m = path.match(/^\/results\/([0-9a-f-]{36})$/))) return <Results id={m[1]!} key={m[1]} />;
   if (path === "/verify") return <Verify />;
@@ -42,10 +41,10 @@ function Routes() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={client}>
-      <Layout>
+    <Layout>
+      <Suspense fallback={<p role="status">Loading…</p>}>
         <Routes />
-      </Layout>
-    </QueryClientProvider>
+      </Suspense>
+    </Layout>
   </StrictMode>,
 );

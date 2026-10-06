@@ -105,21 +105,35 @@ describe("per client address", () => {
 describe("per poll and student number on /start", () => {
   it("limits repeated attempts for one student in one poll; other students and other polls are independent", async () => {
     const w = await makeWorld();
+    const A = await runElection(w, { voters: 12, votes: 0 });
+    const B = await runElection(w, { voters: 12, votes: 0 });
     let n = 0;
     const fresh = () => `10.1.${Math.floor(n / 250)}.${n++ % 250}`; // a new address each time: only the student throttle is in play
-    for (let i = 0; i < STUDENT_LIMIT.limit; i++) expect((await startAs(w, fresh(), POLL_A, "S1234567")).status).toBe(403);
-    const over = await startAs(w, fresh(), POLL_A, "S1234567");
+    const number = A.voters[0]!.number;
+    for (let i = 0; i < STUDENT_LIMIT.limit; i++) expect((await startAs(w, fresh(), A.pollId, number, A.invite)).status).toBe(200);
+    const over = await startAs(w, fresh(), A.pollId, number, A.invite);
     expect(over.status).toBe(429);
     expect(((await over.json()) as { error: string }).error).toBe("rate_limited_student");
-    expect((await startAs(w, fresh(), POLL_A, "S7654321")).status).toBe(403); // another student
-    expect((await startAs(w, fresh(), POLL_B, "S1234567")).status).toBe(403); // same number, another poll
+    expect((await startAs(w, fresh(), A.pollId, A.voters[1]!.number, A.invite)).status).toBe(200); // another student
+    expect((await startAs(w, fresh(), B.pollId, number, B.invite)).status).toBe(200); // same number, another poll
+  });
+
+  it("is not used up by someone without the invite code, so a stranger cannot lock a student out of voting", async () => {
+    const w = await makeWorld({ limiters: { ip: new MemoryRateLimiter(10_000, 60_000), student: new MemoryRateLimiter(STUDENT_LIMIT.limit, 60_000) } });
+    const e = await runElection(w, { voters: 12, votes: 0 });
+    const victim = e.voters[0]!.number;
+    for (let i = 0; i < 5 * STUDENT_LIMIT.limit; i++) expect((await startAs(w, `10.9.0.${i % 250}`, e.pollId, victim, "z".repeat(22))).status).toBe(403);
+    const real = await startAs(w, "10.9.1.1", e.pollId, victim, e.invite);
+    expect(real.status).toBe(200);
   });
 
   it("treats spacing and case as the same student", async () => {
     const w = await makeWorld({ limiters: { ip: new MemoryRateLimiter(1000, 60_000), student: new MemoryRateLimiter(2, 60_000) } });
-    expect((await startAs(w, "10.2.0.1", POLL_A, "S1234567")).status).toBe(403);
-    expect((await startAs(w, "10.2.0.2", POLL_A, " s 1234567 ")).status).toBe(403);
-    expect((await startAs(w, "10.2.0.3", POLL_A, "s1234567")).status).toBe(429);
+    const e = await runElection(w, { voters: 12, votes: 0 });
+    const n = e.voters[0]!.number;
+    expect((await startAs(w, "10.2.0.1", e.pollId, n, e.invite)).status).toBe(200);
+    expect((await startAs(w, "10.2.0.2", e.pollId, ` ${n.toLowerCase().slice(0, 3)} ${n.slice(3)} `, e.invite)).status).toBe(200);
+    expect((await startAs(w, "10.2.0.3", e.pollId, n.toLowerCase(), e.invite)).status).toBe(429);
   });
 
   it("limits a number that is not on the roll exactly as one that is, so the limit reveals nothing about the roll", async () => {
@@ -138,18 +152,21 @@ describe("per poll and student number on /start", () => {
     const seen: string[] = [];
     const spy: RateLimiter = { allow: async (k) => (seen.push(k), true) };
     const w = await makeWorld({ limiters: { ip: spy, student: spy } });
-    for (const number of ["S1234567", " s 1234567 ", "s-9876543"]) await startAs(w, "10.4.0.1", POLL_A, number);
-    await finishAs(w, "10.4.0.1");
+    const e = await runElection(w, { voters: 12, votes: 0 });
+    seen.length = 0;
+    const [n1, n2] = [e.voters[3]!.number, e.voters[4]!.number];
+    for (const number of [n1, ` ${n1.toLowerCase()} `, n2]) await startAs(w, "10.4.0.1", e.pollId, number, e.invite);
+    await finishAs(w, "10.4.0.1", e.pollId);
     expect(seen.length).toBe(7);
     for (const k of seen) {
-      expect(k.toLowerCase()).not.toContain("1234567");
-      expect(k.toLowerCase()).not.toContain("9876543");
-      expect(k).not.toContain(CODE);
+      expect(k.toLowerCase()).not.toContain(n1.slice(1).toLowerCase());
+      expect(k.toLowerCase()).not.toContain(n2.slice(1).toLowerCase());
+      expect(k).not.toContain(e.invite);
     }
     const studentKeys = seen.filter((k) => k.startsWith("s:"));
     expect(studentKeys.length).toBe(3);
     expect(studentKeys[0]).toBe(studentKeys[1]); // normalised before hashing
-    expect(studentKeys[0]).toMatch(new RegExp(`^s:${POLL_A}:[0-9a-f]{64}$`));
+    expect(studentKeys[0]).toMatch(new RegExp(`^s:${e.pollId}:[0-9a-f]{64}$`));
   });
 
   it("derives the key with a secret, so it cannot be reversed by trying student numbers without it", async () => {

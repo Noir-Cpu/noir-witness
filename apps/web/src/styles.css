@@ -107,3 +107,7 @@ table.stack td::before { content: attr(data-label); display: block; font-family:
 }
 footer nav { margin-top: 0.5rem; }
 footer nav a { min-height: 2.75rem; display: inline-flex; align-items: center; }
+
+.field { display: grid; gap: 0.25rem; }
+.field label { font-weight: 600; }
+a.tap { display: inline-flex; align-items: center; min-height: 2.75rem; }

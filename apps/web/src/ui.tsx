@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "./router";
+import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { Link, useLocation } from "./router";
+import { applyHead, headFor } from "./seo";
 
 // Moves focus to the page heading when a page or step changes, so screen-reader and keyboard users land on the new content.
 export function Heading({ children, step }: { children: ReactNode; step?: string }) {
@@ -13,6 +14,8 @@ export function Heading({ children, step }: { children: ReactNode; step?: string
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  const { path } = useLocation();
+  useEffect(() => applyHead(headFor(path)), [path]);
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
@@ -58,5 +61,17 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
       </button>{" "}
       <span role="status" className="meta">{note}</span>
     </>
+  );
+}
+
+/** A labelled input. The hint is a description, not part of the name, so a screen reader says "Student number, edit text" and then the hint. */
+export function Field({ label, hint, ...input }: { label: string; hint?: ReactNode } & InputHTMLAttributes<HTMLInputElement>) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      {hint && <span className="hint" id={`${id}-hint`}>{hint}</span>}
+      <input id={id} aria-describedby={hint ? `${id}-hint` : undefined} {...input} />
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { openPoll } from "./helpers";
 
 // The web build for e2e carries fake Sentry and PostHog keys (playwright.config.ts). Every request to those hosts is
 // intercepted and recorded; nothing leaves the machine.
@@ -25,9 +26,10 @@ test("control: public pages do send telemetry to the configured hosts, with no f
   const seen = await watch(page);
   await page.goto(`/#code=${SECRET}`);
   await expect(page.getByRole("heading", { name: "Votes you can check" })).toBeVisible();
+  // The SDKs load in their own chunk after the page: wait until PostHog has announced the page view, then fail.
+  await expect.poll(() => sentPosthog(seen), { timeout: 10_000 }).toBe(true);
   await boom(page);
   await expect.poll(() => sentSentry(seen), { timeout: 10_000 }).toBe(true);
-  await expect.poll(() => sentPosthog(seen), { timeout: 10_000 }).toBe(true);
   // What was sent never contains the fragment.
   for (const r of seen) {
     expect(r.url).not.toContain(SECRET);
@@ -35,10 +37,11 @@ test("control: public pages do send telemetry to the configured hosts, with no f
   }
 });
 
-test("a voter page sends nothing to Sentry or PostHog, even on error or navigation", async ({ page }) => {
+test("a voter page sends nothing to Sentry or PostHog, even on error or navigation", async ({ page, request }) => {
+  const poll = await openPoll(request, { title: "Telemetry poll" });
   const seen = await watch(page);
-  await page.goto(`/vote/${POLL}#code=${SECRET}`);
-  await expect(page.getByLabel(/Invite code/)).toHaveValue(SECRET);
+  await page.goto(poll.link);
+  await expect(page.getByLabel(/Invite code/)).toHaveValue(poll.code);
   await boom(page);
   await page.getByLabel(/Student number/).fill("S1234567");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -70,8 +73,9 @@ test("navigating from a public page into a voter page stops capturing", async ({
   expect(seen).toEqual([]);
 });
 
-test("a voter who goes over the sign-in limit sees a kind message, and it is accessible", async ({ page }) => {
-  await page.goto(`/vote/${POLL}#code=${SECRET}`);
+test("a voter who goes over the sign-in limit sees a kind message, and it is accessible", async ({ page, request }) => {
+  const poll = await openPoll(request, { title: "Limit poll" });
+  await page.goto(poll.link);
   await page.getByLabel(/Student number/).fill("S7654321");
   const go = page.getByRole("button", { name: "Continue" });
   for (let i = 0; i < 10; i++) {
@@ -88,7 +92,8 @@ test("a voter who goes over the sign-in limit sees a kind message, and it is acc
 test.describe("privacy notice", () => {
   test.use({ viewport: { width: 412, height: 915 }, hasTouch: true });
 
-  test("is linked from every page and from the voter start page, reads well on a phone, and passes axe", async ({ page, context }) => {
+  test("is linked from every page and from the voter start page, reads well on a phone, and passes axe", async ({ page, context, request }) => {
+    const poll = await openPoll(request, { title: "Notice poll" });
     await page.goto("/");
     await page.getByRole("contentinfo").getByRole("link", { name: "Privacy notice" }).click();
     await expect(page.getByRole("heading", { name: "Privacy notice" })).toBeVisible();
@@ -101,15 +106,16 @@ test.describe("privacy notice", () => {
     await expect(page.locator("table.stack td[data-label]").first()).toBeVisible();
     expect(await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector("main")!).paddingLeft))).toBeGreaterThanOrEqual(16);
 
-    for (const path of ["/organiser", "/verify", "/results/" + POLL, `/vote/${POLL}`]) {
+    for (const path of ["/organiser", "/verify", "/results/" + POLL, `/vote/${poll.id}`]) {
       await page.goto(path);
       await expect(page.getByRole("contentinfo").getByRole("link", { name: "Privacy notice" })).toBeVisible();
     }
 
-    await page.goto(`/vote/${POLL}#code=${SECRET}`);
+    await page.goto("/");
+    await page.goto(poll.link);
     const [popup] = await Promise.all([context.waitForEvent("page"), page.getByRole("link", { name: /How your data is handled/ }).click()]);
     await expect(popup.getByRole("heading", { name: "Privacy notice" })).toBeVisible();
-    await expect(page.getByLabel(/Invite code/)).toHaveValue(SECRET); // the form was not lost
+    await expect(page.getByLabel(/Invite code/)).toHaveValue(poll.code); // the form was not lost
   });
 });
 
