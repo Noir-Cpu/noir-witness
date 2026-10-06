@@ -84,19 +84,19 @@ export async function uploadRoll(db: Db, userId: string, pollId: string, csv: st
   return { voters: rows.length, duplicatesIgnored: parsed.duplicates };
 }
 
-// Lets a voter whose number was claimed by someone else start again. Refused once that voter has cast.
+// Lets a voter whose number was claimed by someone else start again (ADR 0013, rule for resets). The organiser must not be
+// able to learn from this call whether a number is on the roll or whether that student has voted, so every call does
+// exactly the same work and answers the same: look up the poll, run one UPDATE keyed by the salted hash (it matches one
+// row, or none), and write one audit row that carries no student number and no outcome. Resetting a voter who has
+// already voted is harmless (the participation row is untouched, so they cannot vote again) and is simply allowed.
 export async function resetVoterPasskey(db: Db, userId: string, pollId: string, studentNumber: string) {
   const poll = await ownedPoll(db, pollId, userId);
   const hash = await hashStudentNumber(poll.rollSalt, studentNumber);
-  const v = await db.query.eligibleVoters.findFirst({ where: and(eq(eligibleVoters.pollId, pollId), eq(eligibleVoters.studentHash, hash)) });
-  if (!v) throw new DomainError("not_found", "That student number is not on the roll", 404);
-  const voted = await db.query.participations.findFirst({ where: and(eq(participations.pollId, pollId), eq(participations.voterId, v.id)) });
-  if (voted) throw new DomainError("already_voted", "That voter has already cast a ballot");
   await db
     .update(eligibleVoters)
     .set({ credentialId: null, credentialPublicKey: null, credentialCounter: null, credentialTransports: null })
-    .where(eq(eligibleVoters.id, v.id));
-  await audit(db, pollId, userId, "voter.passkey_reset");
+    .where(and(eq(eligibleVoters.pollId, pollId), eq(eligibleVoters.studentHash, hash)));
+  await audit(db, pollId, userId, "voter.passkey_reset_requested");
 }
 
 // Shown once. Only the hash is stored (ADR 0008).

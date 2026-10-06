@@ -241,3 +241,14 @@ test("a page cannot be framed", async ({ page, baseURL }) => {
   const hasApp = frame ? await frame.evaluate(() => Boolean(document.querySelector("#root h1"))).catch(() => false) : false;
   expect(hasApp, `iframe result: ${blocked}`).toBe(false);
 });
+
+test("an organiser who is signed in but not approved sees a clear screen, not a broken page", async ({ page }) => {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ user: null, error: "not_approved", message: "This deployment only allows approved organisers." }) }),
+  );
+  await page.goto("/organiser");
+  await expect(page.getByRole("heading", { name: "Not an approved organiser" })).toBeVisible();
+  await expect(page.getByRole("note")).toContainText("only allows approved organisers");
+  await expect(page.getByRole("button", { name: "Create poll" })).toHaveCount(0);
+  await axe(page);
+});

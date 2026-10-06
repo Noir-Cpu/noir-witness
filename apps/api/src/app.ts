@@ -3,7 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { z, ZodError } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { sql } from "drizzle-orm";
-import { createDb, participations, polls, type Db } from "@noir/db";
+import { account, createDb, participations, polls, type Db } from "@noir/db";
 import { publicKeyOf, type Selection } from "@noir/bulletin";
 import { and, eq } from "drizzle-orm";
 import { tracing, type OtelEnv } from "./otel";
@@ -28,6 +28,8 @@ export type Env = AuthEnv &
     RATE_LIMIT_STUDENT?: unknown;
     // Days after close before voter data is erased by the daily cron (wrangler.toml [vars]). Plain text, not a secret.
     PURGE_DAYS?: string;
+    // Optional allow-list of numeric GitHub user ids, comma-separated. Unset: any signed-in user may organise (ADR 0018).
+    ORGANISERS_ALLOWED_GITHUB_IDS?: string;
   };
 export type Organiser = { id: string; name: string };
 
@@ -40,6 +42,12 @@ export type Deps = {
 };
 
 const uuid = z.string().uuid();
+
+/** null: no allow-list. Otherwise the set of listed ids (empty when the variable holds nothing usable, which denies everyone). */
+export function parseAllowedGithubIds(raw: string | undefined): Set<string> | null {
+  if (raw === undefined || raw.trim() === "") return null;
+  return new Set(raw.split(",").map((x) => x.trim()).filter((x) => /^\d{1,20}$/.test(x)));
+}
 
 // A driver error can quote the connection string. Keep the host and drop the credentials, in case it reaches a log.
 const redact = (text: string) => text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^@\s/]*@/gi, "$1***@");
@@ -59,9 +67,21 @@ export function createApp(deps: Deps = {}) {
     return session ? { id: session.user.id, name: session.user.name } : null;
   };
 
+  // Signed in is not the same as approved. When ORGANISERS_ALLOWED_GITHUB_IDS is set, only users whose GitHub account id
+  // (the immutable number, not the login name, which can be renamed or re-registered) is listed may organise.
+  const NOT_APPROVED = "This deployment only allows approved organisers. Ask the person who runs WITNESS to add your GitHub account.";
+  const approved = async (c: Context<{ Bindings: Env }>, o: Organiser): Promise<boolean> => {
+    const allowed = parseAllowedGithubIds(c.env?.ORGANISERS_ALLOWED_GITHUB_IDS);
+    if (allowed === null) return true;
+    if (allowed.size === 0) return false; // set but unreadable: fail closed
+    const rows = await getDb(c.env).select({ id: account.accountId }).from(account).where(and(eq(account.userId, o.id), eq(account.providerId, "github")));
+    return rows.some((r) => allowed.has(r.id));
+  };
+
   const requireOrganiser = async (c: Context<{ Bindings: Env }>) => {
     const o = await getOrganiser(c);
     if (!o) throw new DomainError("unauthenticated", "Sign in as an organiser", 403);
+    if (!(await approved(c, o))) throw new DomainError("not_approved", NOT_APPROVED, 403);
     return { organiser: o, db: getDb(c.env) };
   };
 
@@ -135,7 +155,9 @@ export function createApp(deps: Deps = {}) {
 
   app.get("/me", async (c) => {
     const o = await getOrganiser(c);
-    return o ? c.json({ user: o }) : c.json({ user: null }, 401);
+    if (!o) return c.json({ user: null }, 401);
+    if (!(await approved(c, o))) return c.json({ user: null, error: "not_approved", message: NOT_APPROVED }, 403);
+    return c.json({ user: o });
   });
 
   // ---- Organiser ----------------------------------------------------------------------------------------------

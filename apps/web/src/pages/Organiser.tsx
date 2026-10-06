@@ -16,6 +16,15 @@ export function Organiser() {
   });
 
   if (me.isPending) return <><Heading>Organise</Heading><p role="status">Checking your session…</p></>;
+  if (me.error instanceof ApiError && me.error.code === "not_approved") {
+    return (
+      <>
+        <Heading>Not an approved organiser</Heading>
+        <p className="warning" role="note">This deployment only allows approved organisers, and your GitHub account is not on the list.</p>
+        <p>Voters do not need an account: use the invite link you were sent. If you should be able to organise polls, ask the person who runs this WITNESS site to add your GitHub account.</p>
+      </>
+    );
+  }
   if (me.isError) return <><Heading>Organise</Heading><Alert>{errorText(me.error)}</Alert></>;
   if (!me.data) {
     return (

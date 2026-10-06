@@ -234,7 +234,7 @@ function ResetPasskey({ id, disabled }: { id: string; disabled: boolean }) {
     e.preventDefault();
     try {
       await api(`/organiser/polls/${id}/voters/reset`, { method: "POST", json: { studentNumber: number } });
-      setMsg("Passkey cleared. That student can register again.");
+      setMsg("Done. If that number is on the roll, its passkey is cleared and the student can register again. This page does not say more, so that it cannot be used to find out who has voted.");
       setNumber("");
     } catch (err) {
       setMsg(errorText(err));
